@@ -79,6 +79,8 @@ export class Worker {
                 let toolName;
                 if (role === 'system') {
                     Logger.writeLine(`[${role}]: <system prompt>`, Logger.COLOR_DIM);
+                } else if (role === "toolResult") {
+                    // skip
                 } else {
                     if (Array.isArray(content) && content.length > 0) {
                         for (const block of content) {
@@ -92,11 +94,16 @@ export class Worker {
                         }
                         if (text) {
                             Logger.writeLine(`[${role}]: ${text}`);
-                        } else {
-                            Logger.writeLine(`[${role}]: ### NO TEXT ###`);
                         }
                         if (toolName) {
-                            Logger.writeLine(`### Tool: ${toolName} ###`);
+                            Logger.writeLine(`Tool: ${toolName}`);
+                        }
+                        if (!text && !toolName) {
+                            if (thinking) {
+                                Logger.writeLine(`[${role}]: <thinking only>`, Logger.COLOR_DIM);
+                            } else {
+                                Logger.writeLine(`[${role}]: ### NO CONTENT ###`);
+                            }
                         }
                     } else if (message.errorMessage) {
                         Logger.writeLine(`${message.errorMessage}`, Logger.COLOR_ERROR);
