@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { Logger } from './logger.mjs';
+import { appendFileSync } from 'fs';
 
 export class Worker {
 
@@ -48,8 +49,6 @@ export class Worker {
 
             if (line === '') continue;
 
-            // Logger.writeLine(line);
-
             let record;
             try {
                 record = JSON.parse(line);
@@ -59,6 +58,10 @@ export class Worker {
             }
 
             // Logger.writeLine(`Record type: ${record.type}`);
+
+            if (record.type !== 'message_update') {
+                appendFileSync("run.log", `${line}\n`, "utf8");
+            }
 
             if (record.type === 'message_update') {
                 const amEvent = record.assistantMessageEvent;
