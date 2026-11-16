@@ -2,6 +2,15 @@ import { spawn } from 'child_process';
 import { Logger } from './logger.mjs';
 import { appendFileSync } from 'fs';
 
+const lightRecords = [
+    "turn_end",
+    "agent_end",
+];
+
+const skippedRecords = [
+    "message_update"
+];
+
 export class Worker {
 
     lineBuffer = '';
@@ -57,10 +66,14 @@ export class Worker {
                 continue;
             }
 
-            // Logger.writeLine(`Record type: ${record.type}`);
-
-            if (record.type !== 'message_update') {
-                appendFileSync("run.log", `${line}\n`, "utf8");
+            // some records are skipped, some only logged minimally
+            // this is to avoid log file grow large
+            if (!skippedRecords.includes(record.type)) {
+                if (!lightRecords.includes(record.type)) {
+                    appendFileSync("run.log", `${line}\n`, "utf8");
+                } else {
+                    appendFileSync("run.log", `{"type": "${record.type}"}\n`, "utf8");
+                }
             }
 
             if (record.type === 'message_update') {
