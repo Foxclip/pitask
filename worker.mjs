@@ -112,7 +112,7 @@ export class Worker {
                             }
                         }
                         if (text) {
-                            Logger.writeLine(`[${role}]: ${text}`);
+                            Logger.writeLine(`[${role}]: \n${text}`);
                         }
                         if (toolName) {
                             Logger.writeLine(`Tool: ${toolName}`);
