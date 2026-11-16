@@ -14,7 +14,6 @@ export class Run {
         this.task = task;
         Logger.writeLine("Starting Worker process...");
         this.worker = new Worker();
-        Logger.writeLine("Sending message to Worker...", Logger.COLOR_DIM);
         this.worker.sendMessage(task);
     }
 

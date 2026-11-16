@@ -1,7 +1,8 @@
 import { spawn } from 'child_process';
 import { Logger } from './logger.mjs';
 import { FileLogger } from './filelogger.mjs';
-import { appendFileSync } from 'fs';
+
+const TOOL_MAX_LINE_SIZE = 65;
 
 // these record types are not fully logged because their data is
 // already contained in other types
@@ -16,6 +17,15 @@ const lightRecords = [
 const skippedRecords = [
     "message_update"
 ];
+
+function limitString(str, max_size) {
+    let result = str;
+    if (str && max_size > 3 && str.length > max_size) {
+        result = str.substring(0, max_size - 3);
+        result += "...";
+    }
+    return result;
+}
 
 export class Worker {
 
@@ -89,6 +99,22 @@ export class Worker {
                 } else if (amEvent && amEvent.type === 'text_start') {
                     Logger.writeLine("Worker writing message...", Logger.COLOR_DIM);
                 }
+            } else if (record.type === "tool_execution_start") {
+                const toolName = record.toolName;
+                if (Object.keys(record.args).length === 1) {
+                    const argName = Object.keys(record.args)[0];
+                    const argValue = record.args[argName];
+                    const toolStr = `Tool: ${toolName}: ${argName}: ${argValue}`;
+                    const toolStrLimited = limitString(toolStr, TOOL_MAX_LINE_SIZE);
+                    Logger.writeLine(toolStrLimited);
+                } else {
+                    Logger.writeLine(`Tool: ${record.toolName}`);
+                    for (const [key, value] of Object.entries(record.args)) {
+                        const commandStr = `    ${key}: ${value}`;
+                        const commandStrLimited = limitString(commandStr, TOOL_MAX_LINE_SIZE);
+                        Logger.writeLine(commandStrLimited);
+                    }
+                }       
             } else if (record.type === 'message_end') {
                 const message = record.message;
                 const content = message.content;
@@ -115,7 +141,7 @@ export class Worker {
                             Logger.writeLine(`[${role}]: \n${text}`);
                         }
                         if (toolName) {
-                            Logger.writeLine(`Tool: ${toolName}`);
+                            // Logger.writeLine(`Tool: ${toolName}`);
                         }
                         if (!text && !toolName) {
                             if (thinking) {
