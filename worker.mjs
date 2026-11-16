@@ -54,7 +54,7 @@ export class Worker {
             try {
                 record = JSON.parse(line);
             } catch (err) {
-                Logger.writeLine('Failed to parse JSON record:', line);
+                Logger.writeLine(`Failed to parse JSON record: ${line}`, Logger.COLOR_ERROR);
                 continue;
             }
 
@@ -63,9 +63,9 @@ export class Worker {
             if (record.type === 'message_update') {
                 const amEvent = record.assistantMessageEvent;
                 if (amEvent && amEvent.type === 'thinking_start') {
-                    Logger.writeLine("Worker thinking...");
+                    Logger.writeLine("Worker thinking...", Logger.COLOR_DIM);
                 } else if (amEvent && amEvent.type === 'text_start') {
-                    Logger.writeLine("Worker writing message...");
+                    Logger.writeLine("Worker writing message...", Logger.COLOR_DIM);
                 }
             } else if (record.type === 'message_end') {
                 const message = record.message;
@@ -98,11 +98,11 @@ export class Worker {
                     } else if (message.errorMessage) {
                         Logger.writeLine(`${message.errorMessage}`, Logger.COLOR_ERROR);
                     } else {
-                        Logger.writeLine(line);
+                        Logger.writeLine(line, Logger.COLOR_DIM);
                     }
                 }
             } else if (record.type === 'agent_settled') {
-                Logger.writeLine("Exiting process...");
+                Logger.writeLine("Shutting down Worker process...");
                 this.quit();
             }
         }
