@@ -8,4 +8,5 @@ const task = {
     message: taskText
 };
 const run = new Run(task);
+await run.launch();
 

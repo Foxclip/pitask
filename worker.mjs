@@ -1,6 +1,9 @@
 import { spawn } from 'child_process';
 import { Logger } from './logger.mjs';
 import { FileLogger } from './filelogger.mjs';
+import { EventEmitter, once } from 'events';
+
+const emitter = new EventEmitter();
 
 const TOOL_MAX_LINE_SIZE = 65;
 
@@ -44,7 +47,6 @@ export class Worker {
             [
                 '--mode', 'rpc',
                 '--exclude-tools', ...excludeTools,
-                '--no-session'
             ],
             { stdio: ['pipe', 'pipe', 'inherit'] } // stdout is for protocol, stderr goes to console 
         );
@@ -67,34 +69,56 @@ export class Worker {
         this.piProcess.stdin.write(JSON.stringify(message) + '\n');
     }
 
-    onDataArrive(chunk) {
-        this.lineBuffer += chunk.toString('utf8');
+    static getRecordsFromChunk(chunk) {
+        let lineBuffer = chunk.toString('utf8');
         let lineEndIndex;
-
-        while ((lineEndIndex = this.lineBuffer.indexOf('\n')) !== -1) {
-            let line = this.lineBuffer.slice(0, lineEndIndex);
-            this.lineBuffer = this.lineBuffer.slice(lineEndIndex + 1);
-
+        let records = [];
+        while((lineEndIndex = lineBuffer.indexOf('\n')) !== -1) {
+            let line = lineBuffer.slice(0, lineEndIndex);
+            lineBuffer = lineBuffer.slice(lineEndIndex + 1);
             // Strip optional preceding carriage return to handle CRLF safely
             if (line.endsWith('\r')) {
                 line = line.slice(0, -1);
             }
-
-            if (line === '') continue;
+            if (line === "") {
+                continue;
+            };
 
             let record;
             try {
                 record = JSON.parse(line);
+                records.push(record);
             } catch (err) {
                 Logger.writeLine(`Failed to parse JSON record: ${line}`, Logger.COLOR_ERROR);
-                continue;
             }
+        }
+        return records;
+    }
 
+    async getSessionPath() {
+        const analyzeChunk = (chunk) => { 
+            const records = Worker.getRecordsFromChunk(chunk);
+            for (const record of records) {
+                if (record.type === "response" && record.command === "get_state") {
+                    emitter.emit("done", record.data?.sessionFile);
+                }
+            }
+        };
+        this.piProcess.stdout.on("data", analyzeChunk);
+        this.piProcess.stdin.write('{"type": "get_state"}\n');
+        const result = await once(emitter, "done");
+        this.piProcess.stdout.off("data", analyzeChunk);
+        return result;
+    }
+
+    onDataArrive(chunk) {
+        const records = Worker.getRecordsFromChunk(chunk);
+        for (const record of records) {
             // some records are skipped, some only logged minimally
             // this is to avoid log file grow large
             if (!skippedRecords.includes(record.type)) {
                 if (!lightRecords.includes(record.type)) {
-                    FileLogger.writeLine(line);
+                    FileLogger.writeLine(JSON.stringify(record));
                 } else {
                     FileLogger.writeLine(`{"type": "${record.type}"}`);
                 }
@@ -161,7 +185,7 @@ export class Worker {
                     } else if (message.errorMessage) {
                         Logger.writeLine(`${message.errorMessage}`, Logger.COLOR_ERROR);
                     } else {
-                        Logger.writeLine(line, Logger.COLOR_DIM);
+                        Logger.writeLine(JSON.stringify(record), Logger.COLOR_DIM);
                     }
                 }
             } else if (record.type === 'agent_settled') {

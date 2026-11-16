@@ -8,13 +8,19 @@ export class Run {
     task;
     worker;
     judge;
+    sessionPath;
 
     constructor(task) {
         FileLogger.resetLogFile();
         this.task = task;
+    }
+
+    async launch() {
         Logger.writeLine("Starting Worker process...");
         this.worker = new Worker();
-        this.worker.sendMessage(task);
+        this.sessionPath = await this.worker.getSessionPath();
+        Logger.writeLine(`Session: ${this.sessionPath}`);
+        this.worker.sendMessage(this.task);
     }
 
 }
