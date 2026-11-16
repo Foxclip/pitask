@@ -1,5 +1,6 @@
 import { Worker } from './worker.mjs';
 import { Logger } from './logger.mjs';
+import { FileLogger } from './filelogger.mjs';
 import { writeFileSync } from 'node:fs';
 
 export class Run {
@@ -9,7 +10,7 @@ export class Run {
     judge;
 
     constructor(task) {
-        writeFileSync("run.log", "", "utf8");
+        FileLogger.resetLogFile();
         this.task = task;
         Logger.writeLine("Starting Worker process...");
         this.worker = new Worker();
