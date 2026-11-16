@@ -1,4 +1,5 @@
 import { Worker } from './worker.mjs';
+import { Logger } from './logger.mjs';
 
 export class Run {
 
@@ -8,10 +9,11 @@ export class Run {
 
     constructor(task) {
         this.task = task;
-        console.log("Spawning Worker process...");
+        Logger.writeLine("Spawning Worker process...");
         this.worker = new Worker();
-        console.log("Sending message to Worker...");
+        Logger.writeLine("Sending message to Worker...", Logger.COLOR_DIM);
         this.worker.sendMessage(task);
+        Logger.writeLine("Waiting response from Worker...", Logger.COLOR_DIM);
     }
 
 }

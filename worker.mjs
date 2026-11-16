@@ -1,7 +1,9 @@
 import { spawn } from 'child_process';
+import { Logger } from './logger.mjs';
 
 export class Worker {
 
+    lineBuffer = '';
     piProcess;
 
     constructor() {
@@ -17,7 +19,7 @@ export class Worker {
         }
 
         // event setup
-        this.piProcess.stdout.on('data', this.onDataArrive);
+        this.piProcess.stdout.on('data', (chunk) => this.onDataArrive(chunk));
         this.piProcess.on('close', (code) => {
             process.exit(code ?? 0);
         });
@@ -32,13 +34,12 @@ export class Worker {
     }
 
     onDataArrive(chunk) {
-        let buffer = '';
-        buffer += chunk.toString('utf8');
+        this.lineBuffer += chunk.toString('utf8');
         let lineEndIndex;
 
-        while ((lineEndIndex = buffer.indexOf('\n')) !== -1) {
-            let line = buffer.slice(0, lineEndIndex);
-            buffer = buffer.slice(lineEndIndex + 1);
+        while ((lineEndIndex = this.lineBuffer.indexOf('\n')) !== -1) {
+            let line = this.lineBuffer.slice(0, lineEndIndex);
+            this.lineBuffer = this.lineBuffer.slice(lineEndIndex + 1);
 
             // Strip optional preceding carriage return to handle CRLF safely
             if (line.endsWith('\r')) {
@@ -47,28 +48,68 @@ export class Worker {
 
             if (line === '') continue;
 
+            // Logger.writeLine(line);
+
             let record;
             try {
                 record = JSON.parse(line);
             } catch (err) {
-                console.error('Failed to parse JSON record:', line);
+                Logger.writeLine('Failed to parse JSON record:', line);
                 continue;
             }
 
+            // Logger.writeLine(`Record type: ${record.type}`);
+
             if (record.type === 'message_update') {
-                const update = record.assistantMessageEvent;
-                if (update && update.type === 'text_delta') {
-                    process.stdout.write(update.delta);
+                const amEvent = record.assistantMessageEvent;
+                if (amEvent && amEvent.type === 'thinking_start') {
+                    Logger.writeLine("Worker thinking...");
+                } else if (amEvent && amEvent.type === 'text_start') {
+                    Logger.writeLine("Worker writing message...");
+                }
+            } else if (record.type === 'message_end') {
+                const message = record.message;
+                const content = message.content;
+                const role = message.role;
+                let thinking;
+                let text;
+                let toolName;
+                if (role === 'system') {
+                    Logger.writeLine(`[${role}]: <system prompt>`, Logger.COLOR_DIM);
+                } else {
+                    if (Array.isArray(content) && content.length > 0) {
+                        for (const block of content) {
+                            if (block.type === 'thinking') {
+                                thinking = block.thinking;
+                            } else if (block.type === 'text') {
+                                text = block.text;
+                            } else if (block.type === 'toolCall') {
+                                toolName = block.name;
+                            }
+                        }
+                        if (text) {
+                            Logger.writeLine(`[${role}]: ${text}`);
+                        } else {
+                            Logger.writeLine(`[${role}]: ### NO TEXT ###`);
+                        }
+                        if (toolName) {
+                            Logger.writeLine(`### Tool: ${toolName} ###`);
+                        }
+                    } else if (message.errorMessage) {
+                        Logger.writeLine(`${message.errorMessage}`, Logger.COLOR_ERROR);
+                    } else {
+                        Logger.writeLine(line);
+                    }
                 }
             } else if (record.type === 'agent_settled') {
-                console.log("Exiting process...");
+                Logger.writeLine("Exiting process...");
                 this.quit();
             }
         }
     }
 
     quit() {
-        console.log();
+        Logger.writeLine();
         this.piProcess.stdin.end();
     }
 }
