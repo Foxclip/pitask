@@ -18,6 +18,10 @@ const skippedRecords = [
     "message_update"
 ];
 
+const excludeTools = [
+    "ask_user_question"
+];
+
 function limitString(str, max_size) {
     let result = str;
     if (str && max_size > 3 && str.length > max_size) {
@@ -37,7 +41,11 @@ export class Worker {
         // start the Pi process in RPC mode
         this.piProcess = spawn(
             'pi',
-            ['--mode', 'rpc', '--no-session'],
+            [
+                '--mode', 'rpc',
+                '--exclude-tools', ...excludeTools,
+                '--no-session'
+            ],
             { stdio: ['pipe', 'pipe', 'inherit'] } // stdout is for protocol, stderr goes to console 
         );
         if (!this.piProcess.stdin || !this.piProcess.stdout) {
