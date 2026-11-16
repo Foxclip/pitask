@@ -2,11 +2,16 @@ import { spawn } from 'child_process';
 import { Logger } from './logger.mjs';
 import { appendFileSync } from 'fs';
 
+// these record types are not fully logged because their data is
+// already contained in other types
 const lightRecords = [
+    "message_start",
     "turn_end",
     "agent_end",
+    "tool_execution_end",
 ];
 
+// to avoid spamming log file on every streamed chunk
 const skippedRecords = [
     "message_update"
 ];
