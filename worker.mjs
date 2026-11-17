@@ -136,11 +136,11 @@ export class Worker {
                 if (Object.keys(record.args).length === 1) {
                     const argName = Object.keys(record.args)[0];
                     const argValue = record.args[argName];
-                    const toolStr = `Tool: ${toolName}: ${argName}: ${argValue}`;
+                    const toolStr = `${toolName}: ${argName}: ${argValue}`;
                     const toolStrLimited = limitString(toolStr, TOOL_MAX_LINE_SIZE);
                     Logger.writeLine(toolStrLimited);
                 } else {
-                    Logger.writeLine(`Tool: ${record.toolName}`);
+                    Logger.writeLine(`${toolName}:`);
                     for (const [key, value] of Object.entries(record.args)) {
                         const commandStr = `    ${key}: ${value}`;
                         const commandStrLimited = limitString(commandStr, TOOL_MAX_LINE_SIZE);

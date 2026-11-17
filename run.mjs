@@ -19,7 +19,7 @@ export class Run {
         Logger.writeLine("Starting Worker process...");
         this.worker = new Worker();
         this.sessionPath = await this.worker.getSessionPath();
-        Logger.writeLine(`Session: ${this.sessionPath}`);
+        Logger.writeLine(`Session: ${this.sessionPath}`, Logger.COLOR_DIM);
         this.worker.sendMessage(this.task);
     }
 
