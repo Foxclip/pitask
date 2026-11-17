@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { Logger } from './logger.mjs';
 import { FileLogger } from './filelogger.mjs';
 import { EventEmitter, once } from 'events';
+import { ChunkProcessor } from './chunk_processor.mjs';
 
 const emitter = new EventEmitter();
 
@@ -36,7 +37,7 @@ function limitString(str, max_size) {
 
 export class Worker {
 
-    lineBuffer = '';
+    chunkProcessor;
     piProcess;
 
     constructor() {
@@ -55,6 +56,7 @@ export class Worker {
         }
 
         // event setup
+        this.chunkProcessor = new ChunkProcessor();
         this.piProcess.stdout.on('data', (chunk) => this.onDataArrive(chunk));
         this.piProcess.on('close', (code) => {
             process.exit(code ?? 0);
@@ -69,35 +71,9 @@ export class Worker {
         this.piProcess.stdin.write(JSON.stringify(message) + '\n');
     }
 
-    static getRecordsFromChunk(chunk) {
-        let lineBuffer = chunk.toString('utf8');
-        let lineEndIndex;
-        let records = [];
-        while((lineEndIndex = lineBuffer.indexOf('\n')) !== -1) {
-            let line = lineBuffer.slice(0, lineEndIndex);
-            lineBuffer = lineBuffer.slice(lineEndIndex + 1);
-            // Strip optional preceding carriage return to handle CRLF safely
-            if (line.endsWith('\r')) {
-                line = line.slice(0, -1);
-            }
-            if (line === "") {
-                continue;
-            };
-
-            let record;
-            try {
-                record = JSON.parse(line);
-                records.push(record);
-            } catch (err) {
-                Logger.writeLine(`Failed to parse JSON record: ${line}`, Logger.COLOR_ERROR);
-            }
-        }
-        return records;
-    }
-
     async getSessionPath() {
         const analyzeChunk = (chunk) => { 
-            const records = Worker.getRecordsFromChunk(chunk);
+            const records = this.chunkProcessor.getRecords(chunk);
             for (const record of records) {
                 if (record.type === "response" && record.command === "get_state") {
                     emitter.emit("done", record.data?.sessionFile);
@@ -112,7 +88,7 @@ export class Worker {
     }
 
     onDataArrive(chunk) {
-        const records = Worker.getRecordsFromChunk(chunk);
+        const records = this.chunkProcessor.getRecords(chunk);
         for (const record of records) {
             // some records are skipped, some only logged minimally
             // this is to avoid log file grow large
