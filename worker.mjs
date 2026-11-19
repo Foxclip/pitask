@@ -63,11 +63,9 @@ export class Worker {
         this.chunkProcessor = new ChunkProcessor();
         this.piProcess.stdout.on('data', (chunk) => this.onDataArrive(chunk));
         this.piProcess.on('close', (code) => {
-            // process.exit(code ?? 0);
         });
         this.piProcess.on('error', (err) => {
             console.error('Failed to start Worker Pi process. Is the "pi" CLI installed and in your PATH?', err.message);
-            // process.exit(1);
         });
     }
 
