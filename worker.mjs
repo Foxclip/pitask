@@ -3,6 +3,7 @@ import { Logger } from './logger.mjs';
 import { FileLogger } from './filelogger.mjs';
 import { EventEmitter, once } from 'events';
 import { ChunkProcessor } from './chunk_processor.mjs';
+import { readFileSync } from 'fs';
 
 const emitter = new EventEmitter();
 
@@ -37,10 +38,13 @@ function limitString(str, max_size) {
 
 export class Worker {
 
+    taskPath;
     chunkProcessor;
     piProcess;
 
-    constructor() {
+    constructor(taskPath) {
+
+        this.taskPath = taskPath;
 
         // start the Pi process in RPC mode
         this.piProcess = spawn(
@@ -52,23 +56,29 @@ export class Worker {
             { stdio: ['pipe', 'pipe', 'inherit'] } // stdout is for protocol, stderr goes to console 
         );
         if (!this.piProcess.stdin || !this.piProcess.stdout) {
-            throw new Error('Failed to initialize process streams.');
+            throw new Error('Failed to initialize Worker process streams.');
         }
 
         // event setup
         this.chunkProcessor = new ChunkProcessor();
         this.piProcess.stdout.on('data', (chunk) => this.onDataArrive(chunk));
         this.piProcess.on('close', (code) => {
-            process.exit(code ?? 0);
+            // process.exit(code ?? 0);
         });
         this.piProcess.on('error', (err) => {
-            console.error('Failed to start Pi process. Is the "pi" CLI installed and in your PATH?', err.message);
-            process.exit(1);
+            console.error('Failed to start Worker Pi process. Is the "pi" CLI installed and in your PATH?', err.message);
+            // process.exit(1);
         });
     }
 
-    sendMessage(message) {
-        this.piProcess.stdin.write(JSON.stringify(message) + '\n');
+    start() {
+        const taskText = readFileSync(this.taskPath, "utf8");
+        const task = {
+            id: "prompt-1",
+            type: "prompt",
+            message: taskText
+        };
+        this.piProcess.stdin.write(JSON.stringify(task) + '\n');
     }
 
     async getSessionPath() {
@@ -82,7 +92,7 @@ export class Worker {
         };
         this.piProcess.stdout.on("data", analyzeChunk);
         this.piProcess.stdin.write('{"type": "get_state"}\n');
-        const result = await once(emitter, "done");
+        const [result] = await once(emitter, "done");
         this.piProcess.stdout.off("data", analyzeChunk);
         return result;
     }
