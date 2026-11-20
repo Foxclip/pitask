@@ -1,6 +1,6 @@
 import { styleText } from "node:util";
 
-export class Logger {
+export class TerminalLogger {
 
     static COLOR_DIM = "#777777";
     static COLOR_ERROR = "red";

@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { Run } from './run.mjs';
 import { parseArgs } from "node:util";
 
@@ -24,3 +23,4 @@ const judgeCycleTime = durationToSeconds(cmdArgs.cycle);
 const run = new Run(cmdArgs.task, judgeCycleTime);
 await run.launch();
 
+// TODO: log terminal output to file

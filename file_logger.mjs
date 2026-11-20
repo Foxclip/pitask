@@ -1,23 +1,27 @@
 import { writeFileSync, appendFileSync } from "fs";
 
-const logFile = "run.log";
-
 export class FileLogger {
+
+    filename;
+
+    constructor(filename) {
+        this.filename = filename;   
+    }
     
-    static resetLogFile() {
-        writeFileSync(logFile, "", "utf8");
+    clearLogFile() {
+        writeFileSync(this.filename, "", "utf8");
     }
 
-    static write(text) {
-        appendFileSync(logFile, text, "utf8");
+    write(text) {
+        appendFileSync(this.filename, text, "utf8");
     }
 
-    static writeIsoTime() {
+    writeIsoTime() {
         const isoTime = new Date().toISOString();
         this.write(`[${isoTime}]`);
     }
 
-    static writeLine(line) {
+    writeLine(line) {
         this.writeIsoTime();
         this.write(" ");
         this.write(`${line}\n`);

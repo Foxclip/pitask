@@ -1,22 +1,20 @@
-import EventEmitter from "node:events";
-import { spawn } from "node:child_process";
-import { Logger } from "./logger.mjs";
+import { Session } from "./session.mjs";
 
-const excludeTools = [
-    "ask_user_question",
-    "edit",
-    "write"
-];
+export class Judge extends Session {
 
-export class Judge {
+    prompt;
 
-    piProcess;
-    lastMessage = "";
-    eventEmitter = new EventEmitter();
+    constructor(fileLogger) {
+        super("Judge", fileLogger, [
+            "ask_user_question",
+            "edit",
+            "write"
+        ]);
+    }
 
-    constructor(taskPath, workerSessionPath) {
+    start(taskPath, workerSessionPath) {
 
-        const prompt = `You are one cycle of the judge for a pitask run: a pi worker agent executing the task in ${taskPath}.
+        this.prompt = `You are one cycle of the judge for a pitask run: a pi worker agent executing the task in ${taskPath}.
 You are STATELESS: your only context is what you read from disk right now. Do not assume anything from a previous cycle — the loop keeps its memory in files, not in you.
 
 Worker session file: ${workerSessionPath}
@@ -53,35 +51,32 @@ use it for slow progress (NUDGE), a task that cannot succeed (STOP), or
 ordinary stuckness (NUDGE first).
 
 Any other final line is treated as OK. Do NOT end with anything after the DECISION line.`;
-        this.piProcess = spawn(
-            "pi",
-            [
-                "--print", prompt,
-                "--exclude-tools", excludeTools.join(","),
-            ],
-            { stdio: ['pipe', 'pipe', 'inherit'] }
-        );
-        if (!this.piProcess.stdin || !this.piProcess.stdout) {
-            throw new Error('Failed to initialize Judge process streams.');
-        }
-        this.piProcess.stdin.end();
 
-        // event setup
-        this.piProcess.stdout.on('data', (message) => {
-            this.lastMessage += message;
-        });
-        this.piProcess.on('close', (code) => {
-            Logger.writeLine(`[judge]: \n${this.lastMessage}`);
-            const messageTrimmed = this.lastMessage.trimEnd();
+        const task = {
+            id: "judge-prompt",
+            type: "prompt",
+            message: this.prompt
+        };
+        this.piProcess.stdin.write(JSON.stringify(task) + '\n');
+    }
+
+    onClose(code) {
+        if (this.messages.length > 0) {
+            const lastMessage = this.messages.at(-1);
+            this.terminalLog(`[judge]: \n${lastMessage}`);
+            const messageTrimmed = lastMessage.trimEnd();
             const lastLine = messageTrimmed.slice(messageTrimmed.lastIndexOf('\n') + 1);
             const m = lastLine.match(/^DECISION:\s*(.*)$/);
             const verdict = m ? m[1].trim() : (code === 0 ? "OK" : `ERROR: judge exited with code ${code}`);
             this.eventEmitter.emit("done", verdict);
-        });
-        this.piProcess.on('error', (err) => {
-            console.error('Failed to start Judge Pi process. Is the "pi" CLI installed and in your PATH?', err.message);
-            this.eventEmitter.emit("done", "ERROR: " + err.message);
-        });
+        } else {
+            this.eventEmitter.emit("done", `ERROR: judge exited with code ${code}`);
+        }
+    }
+
+    onError(err) {
+        super.onError(err);
+        this.eventEmitter.emit("done", "ERROR: " + err.message);
     }
 
 }

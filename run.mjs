@@ -1,8 +1,7 @@
 import { Worker } from './worker.mjs';
 import { Judge } from './judge.mjs';
-import { Logger } from './logger.mjs';
-import { FileLogger } from './filelogger.mjs';
-import { writeFileSync } from 'node:fs';
+import { TerminalLogger } from './terminal_logger.mjs';
+import { FileLogger } from './file_logger.mjs';
 import { once } from 'node:events';
 
 export class Run {
@@ -12,9 +11,14 @@ export class Run {
     judgeCycleTime;
     judgeTimer;
     workerSessionPath;
+    judgeFileLogger;
+    workerFileLogger;
 
     constructor(taskPath, judgeCycleTime) {
-        FileLogger.resetLogFile();
+        this.judgeFileLogger = new FileLogger("judge.log");
+        this.judgeFileLogger.clearLogFile();
+        this.workerFileLogger = new FileLogger("worker.log");
+        this.workerFileLogger.clearLogFile();
         this.taskPath = taskPath;
         this.judgeCycleTime = judgeCycleTime;
     }
@@ -27,20 +31,28 @@ export class Run {
     }
 
     async processJudgeCycle() {
-        Logger.writeLine("Starting Judge process...");
-        const judge = new Judge(this.taskPath, this.workerSessionPath);
-        const [verdict] = await once(judge.eventEmitter, "done");
-        Logger.writeLine(`Judge verdict: ${verdict}`);
+        TerminalLogger.writeLine("Starting Judge process...");
+        const judge = new Judge(this.judgeFileLogger);
+        judge.start(this.taskPath, this.workerSessionPath);
+        try {
+            const [verdict] = await once(judge.eventEmitter, "done", {
+                signal: AbortSignal.timeout(30 * 60 * 1000)
+            });
+            TerminalLogger.writeLine(`Judge verdict: ${verdict}`);
+        } catch (error) {
+            judge.killProcess();
+            TerminalLogger.write(`Judge error: ${error.message}`, TerminalLogger.COLOR_ERROR);
+        }
     }
 
     async launch() {
-        Logger.writeLine("Starting Worker process...");
-        this.worker = new Worker(this.taskPath);
+        TerminalLogger.writeLine("Starting Worker process...");
+        this.worker = new Worker(this.workerFileLogger);
         this.workerSessionPath = await this.worker.getSessionPath();
-        Logger.writeLine(`Session: ${this.workerSessionPath}`, Logger.COLOR_DIM);
+        TerminalLogger.writeLine(`Session: ${this.workerSessionPath}`, TerminalLogger.COLOR_DIM);
         // this.setJudgeTimer(this.judgeCycleTime);
         this.setJudgeTimer(0);
-        this.worker.start();
+        this.worker.start(this.taskPath);
     }
 
 }
