@@ -87,13 +87,16 @@ export class Session {
         };
         this.piProcess.stdout.on("data", analyzeChunk);
         this.piProcess.stdin.write('{"type": "get_state"}\n');
+        if (this.exited) {
+            throw new Error("Cannot get session path: session already exited");
+        }
         const [type, [payload]] = await Promise.race([
             once(this.eventEmitter, "session").then(p => ["session", p]),
             once(this.eventEmitter, "exit").then(p => ["exit", p])
         ]);
         this.piProcess.stdout.off("data", analyzeChunk);
         if (type !== "session") {
-            throw new Error("Cannot get session path");
+            throw new Error(`Cannot get session path (exit: ${payload})`);
         }
         return payload;
     }
@@ -203,7 +206,7 @@ export class Session {
 
     onError(err) {
         this.terminalLog(`Failed to start ${this.sessionType} Pi process. Is the "pi" CLI installed and in your PATH? Error: ${err.message}`, TerminalLogger.COLOR_ERROR);
-        this.tryTriggerExit();
+        this.tryTriggerExit(null);
     }
 
     killProcess() {

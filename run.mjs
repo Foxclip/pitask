@@ -39,6 +39,9 @@ export class Run {
             timer = setTimeout(() => reject(new Error("Timeout exceeded")), 30 * 60 * 1000);
         });
         try {
+            if (judge.exited) {
+                throw new Error("Judge exited already");
+            }
             const [type, [payload]] = await Promise.race([
                 once(judge.eventEmitter, "done").then(p => ["done", p]),
                 once(judge.eventEmitter, "exit").then(p => ["exit", p]),
@@ -47,7 +50,11 @@ export class Run {
             if (type === "done") {
                 TerminalLogger.writeLine(`Judge verdict: ${payload}`);
             } else if (type === "exit") {
-                TerminalLogger.writeLine(`Judge exit code: ${payload}`);
+                if (payload === null) {
+                    TerminalLogger.writeLine(`Judge process failed to start`, TerminalLogger.COLOR_ERROR);
+                } else {
+                    TerminalLogger.writeLine(`Judge exit code: ${payload}`);
+                }
             }
         } catch (error) {
             judge.killProcess();
