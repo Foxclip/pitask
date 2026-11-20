@@ -75,14 +75,15 @@ Any other final line is treated as OK. Do NOT end with anything after the DECISI
     }
 
     onClose(code) {
+        super.onClose(code);
         if (code !== 0) {
             this.terminalLog(`Judge exited with code ${code}`, TerminalLogger.COLOR_ERROR);
         }
     }
 
     onError(err) {
+        this.eventEmitter.emit("done", "ERROR: " + err.message); // before exit event, so that promises waiting for both events get this event
         super.onError(err);
-        this.eventEmitter.emit("done", "ERROR: " + err.message);
     }
 
 }

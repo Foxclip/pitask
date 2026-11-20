@@ -9,6 +9,7 @@ export class Session {
     chunkProcessor;
     piProcess;
     sessionType;
+    exited = false;
 
     // these record types are not fully logged because their data is
     // already contained in other types
@@ -86,9 +87,15 @@ export class Session {
         };
         this.piProcess.stdout.on("data", analyzeChunk);
         this.piProcess.stdin.write('{"type": "get_state"}\n');
-        const [result] = await once(this.eventEmitter, "session");
+        const [type, [payload]] = await Promise.race([
+            once(this.eventEmitter, "session").then(p => ["session", p]),
+            once(this.eventEmitter, "exit").then(p => ["exit", p])
+        ]);
         this.piProcess.stdout.off("data", analyzeChunk);
-        return result;
+        if (type !== "session") {
+            throw new Error("Cannot get session path");
+        }
+        return payload;
     }
 
     terminalLog(text, color) {
@@ -190,10 +197,13 @@ export class Session {
 
     onSettle() {  }
 
-    onClose() {  }
+    onClose(code) {
+        this.tryTriggerExit(code);
+    }
 
     onError(err) {
         this.terminalLog(`Failed to start ${this.sessionType} Pi process. Is the "pi" CLI installed and in your PATH? Error: ${err.message}`, TerminalLogger.COLOR_ERROR);
+        this.tryTriggerExit();
     }
 
     killProcess() {
@@ -203,6 +213,13 @@ export class Session {
     quit() {
         this.terminalLog(`Shutting down ${this.sessionType} process...`, TerminalLogger.COLOR_DIM);
         this.piProcess.stdin.end();
+    }
+
+    tryTriggerExit(code) {
+        if (!this.exited) {
+            this.exited = true;
+            this.eventEmitter.emit("exit", code);
+        }
     }
 }
 

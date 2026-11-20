@@ -34,14 +34,26 @@ export class Run {
         TerminalLogger.writeLine("Starting Judge process...", TerminalLogger.COLOR_DIM);
         const judge = new Judge(this.judgeFileLogger);
         judge.start(this.taskPath, this.workerSessionPath);
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error("Timeout exceeded")), 30 * 60 * 1000);
+        });
         try {
-            const [verdict] = await once(judge.eventEmitter, "done", {
-                signal: AbortSignal.timeout(30 * 60 * 1000)
-            });
-            TerminalLogger.writeLine(`Judge verdict: ${verdict}`);
+            const [type, [payload]] = await Promise.race([
+                once(judge.eventEmitter, "done").then(p => ["done", p]),
+                once(judge.eventEmitter, "exit").then(p => ["exit", p]),
+                timeout
+            ]);
+            if (type === "done") {
+                TerminalLogger.writeLine(`Judge verdict: ${payload}`);
+            } else if (type === "exit") {
+                TerminalLogger.writeLine(`Judge exit code: ${payload}`);
+            }
         } catch (error) {
             judge.killProcess();
             TerminalLogger.write(`Judge error: ${error.message}`, TerminalLogger.COLOR_ERROR);
+        } finally {
+            clearTimeout(timer);
         }
     }
 
