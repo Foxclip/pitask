@@ -1,5 +1,5 @@
 import { Session } from "./session.mjs";
-import {TerminalLogger} from "./terminal_logger.mjs";
+import { TerminalLogger } from "./terminal_logger.mjs";
 
 export class Judge extends Session {
 
@@ -71,13 +71,6 @@ Any other final line is treated as OK. Do NOT end with anything after the DECISI
             this.eventEmitter.emit("done", verdict);
         } else {
             this.eventEmitter.emit("done", `ERROR: no messages`);
-        }
-    }
-
-    onClose(code) {
-        super.onClose(code);
-        if (code !== 0) {
-            this.terminalLog(`Judge exited with code ${code}`, TerminalLogger.COLOR_ERROR);
         }
     }
 

@@ -51,9 +51,9 @@ export class Run {
                 TerminalLogger.writeLine(`Judge verdict: ${payload}`);
             } else if (type === "exit") {
                 if (payload === null) {
-                    TerminalLogger.writeLine(`Judge process failed to start`, TerminalLogger.COLOR_ERROR);
+                    TerminalLogger.writeLine("Judge process failed to start", TerminalLogger.COLOR_ERROR);
                 } else {
-                    TerminalLogger.writeLine(`Judge exit code: ${payload}`);
+                    TerminalLogger.writeLine(`Judge exited: ${payload}`);
                 }
             }
         } catch (error) {

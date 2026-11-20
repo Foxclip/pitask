@@ -70,7 +70,7 @@ export class Session {
         // event setup
         this.chunkProcessor = new ChunkProcessor();
         this.piProcess.stdout.on('data', (chunk) => this.onDataArrive(chunk));
-        this.piProcess.on('close', (code) => { this.onClose(code); });
+        this.piProcess.on('close', (code, signal) => { this.onClose(code, signal); });
         this.piProcess.on('error', (err) => { this.onError(err); });
     }
 
@@ -86,10 +86,10 @@ export class Session {
             }
         };
         this.piProcess.stdout.on("data", analyzeChunk);
-        this.piProcess.stdin.write('{"type": "get_state"}\n');
         if (this.exited) {
             throw new Error("Cannot get session path: session already exited");
         }
+        this.piProcess.stdin.write('{"type": "get_state"}\n');
         const [type, [payload]] = await Promise.race([
             once(this.eventEmitter, "session").then(p => ["session", p]),
             once(this.eventEmitter, "exit").then(p => ["exit", p])
@@ -200,8 +200,8 @@ export class Session {
 
     onSettle() {  }
 
-    onClose(code) {
-        this.tryTriggerExit(code);
+    onClose(code, signal) {
+        this.tryTriggerExit(signal ? `killed by ${signal}` : code);
     }
 
     onError(err) {
