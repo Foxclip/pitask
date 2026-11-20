@@ -182,10 +182,13 @@ export class Session {
                     }
                 }
             } else if (record.type === 'agent_settled') {
+                this.onSettle();
                 this.quit();
             }
         }
     }
+
+    onSettle() {  }
 
     onClose() {  }
 
