@@ -37,6 +37,8 @@ finished answer is OK — the worker may already be done.)
 You are READ-ONLY: inspect files only — never modify anything in this
 directory, the worker is working here.
 
+If you mention specific time in your message, it must be local time, not ISO.
+
 Output format (STRICT): your final line must be exactly one of:
 DECISION: OK
 DECISION: NUDGE: <one-line message, specific, actionable, referencing what you saw>
