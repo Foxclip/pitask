@@ -63,7 +63,6 @@ Any other final line is treated as OK. Do NOT end with anything after the DECISI
     onClose(code) {
         if (this.messages.length > 0) {
             const lastMessage = this.messages.at(-1);
-            this.terminalLog(`[judge]: \n${lastMessage}`);
             const messageTrimmed = lastMessage.trimEnd();
             const lastLine = messageTrimmed.slice(messageTrimmed.lastIndexOf('\n') + 1);
             const m = lastLine.match(/^DECISION:\s*(.*)$/);
