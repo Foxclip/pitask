@@ -31,7 +31,7 @@ export class Run {
     }
 
     async processJudgeCycle() {
-        TerminalLogger.writeLine("Starting Judge process...");
+        TerminalLogger.writeLine("Starting Judge process...", TerminalLogger.COLOR_DIM);
         const judge = new Judge(this.judgeFileLogger);
         judge.start(this.taskPath, this.workerSessionPath);
         try {
@@ -46,10 +46,9 @@ export class Run {
     }
 
     async launch() {
-        TerminalLogger.writeLine("Starting Worker process...");
+        TerminalLogger.writeLine("Starting Worker process...", TerminalLogger.COLOR_DIM);
         this.worker = new Worker(this.workerFileLogger);
         this.workerSessionPath = await this.worker.getSessionPath();
-        TerminalLogger.writeLine(`Session: ${this.workerSessionPath}`, TerminalLogger.COLOR_DIM);
         // this.setJudgeTimer(this.judgeCycleTime);
         this.setJudgeTimer(0);
         this.worker.start(this.taskPath);

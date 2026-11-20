@@ -145,8 +145,10 @@ export class Session {
                 let text;
                 let toolName;
                 if (role === 'system') {
-                    this.terminalLog(`[${this.sessionType}]: <system prompt>`, TerminalLogger.COLOR_DIM);
+                    // skip
                 } else if (role === "toolResult") {
+                    // skip
+                } else if (role === "user") {
                     // skip
                 } else {
                     if (Array.isArray(content) && content.length > 0) {
@@ -180,7 +182,6 @@ export class Session {
                     }
                 }
             } else if (record.type === 'agent_settled') {
-                this.terminalLog(`Shutting down ${this.sessionType} process...`);
                 this.quit();
             }
         }
@@ -197,7 +198,7 @@ export class Session {
     }
 
     quit() {
-        this.terminalLog();
+        this.terminalLog(`Shutting down ${this.sessionType} process...`, TerminalLogger.COLOR_DIM);
         this.piProcess.stdin.end();
     }
 }
