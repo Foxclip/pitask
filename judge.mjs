@@ -13,7 +13,9 @@ export class Judge extends Session {
         ]);
     }
 
-    start(taskPath, workerSessionPath) {
+    async start(taskPath, workerSessionPath) {
+
+        await super.start();
 
         this.prompt = `You are one cycle of the judge for a pitask run: a pi worker agent executing the task in ${taskPath}.
 You are STATELESS: your only context is what you read from disk right now. Do not assume anything from a previous cycle — the loop keeps its memory in files, not in you.

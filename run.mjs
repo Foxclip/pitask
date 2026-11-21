@@ -10,7 +10,6 @@ export class Run {
     worker;
     judgeCycleTime;
     judgeTimer;
-    workerSessionPath;
     judgeFileLogger;
     workerFileLogger;
 
@@ -34,7 +33,6 @@ export class Run {
         // start Judge process
         TerminalLogger.writeLine("Starting Judge process...", TerminalLogger.COLOR_DIM);
         const judge = new Judge(this.judgeFileLogger);
-        judge.start(this.taskPath, this.workerSessionPath);
 
         // wait for it
         let verdict;
@@ -43,6 +41,7 @@ export class Run {
             timer = setTimeout(() => reject(new Error("Timeout exceeded")), 30 * 60 * 1000);
         });
         try {
+            await judge.start(this.taskPath, this.worker.sessionPath);
             if (judge.exited) {
                 throw new Error("Judge exited already");
             }
@@ -62,8 +61,12 @@ export class Run {
                 }
             }
         } catch (error) {
-            judge.killProcess();
-            TerminalLogger.write(`Judge error: ${error.message}`, TerminalLogger.COLOR_ERROR);
+            if (judge.exited) {
+                TerminalLogger.writeLine("Judge process failed to start", TerminalLogger.COLOR_ERROR);
+            } else {
+                judge.killProcess();
+                TerminalLogger.writeLine(`Judge error: ${error.message}`, TerminalLogger.COLOR_ERROR);
+            }
         } finally {
             clearTimeout(timer);
         }
@@ -94,10 +97,9 @@ export class Run {
     async launch() {
         TerminalLogger.writeLine("Starting Worker process...", TerminalLogger.COLOR_DIM);
         this.worker = new Worker(this.workerFileLogger);
-        this.workerSessionPath = await this.worker.getSessionPath();
         // this.setJudgeTimer(this.judgeCycleTime);
+        await this.worker.start(this.taskPath);
         this.setJudgeTimer(0); // for now fires once at the beginning
-        this.worker.start(this.taskPath);
     }
 
 }

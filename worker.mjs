@@ -9,7 +9,8 @@ export class Worker extends Session {
         super("Worker", fileLogger);
     }
 
-    start(taskPath) {
+    async start(taskPath) {
+        await super.start();
         this.taskPath = taskPath;
         const taskText = readFileSync(this.taskPath, "utf8");
         const task = {

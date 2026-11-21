@@ -6,6 +6,7 @@ import { ChunkProcessor } from './chunk_processor.mjs';
 
 export class Session {
 
+    sessionPath;
     chunkProcessor;
     piProcess;
     sessionType;
@@ -76,7 +77,9 @@ export class Session {
         this.piProcess.on('error', (err) => { this.onError(err); });
     }
 
-    start() {  }
+    async start() {
+        this.sessionPath = await this.getSessionPath();
+    }
 
     async getSessionPath() {
         const analyzeChunk = (chunk) => { 
