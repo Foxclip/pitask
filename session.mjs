@@ -6,13 +6,18 @@ import { ChunkProcessor } from './chunk_processor.mjs';
 
 export class Session {
 
+    TOOL_MAX_LINE_SIZE = 65;
+
     sessionPath;
     chunkProcessor;
     piProcess;
     sessionType;
-    settled = false; // currently is not reset anywhere
+    settled = false;
     exited = false;
     steerCount = 0;
+    messages = [];
+    eventEmitter = new EventEmitter();
+    fileLogger;
 
     // these record types are not fully logged because their data is
     // already contained in other types
@@ -31,14 +36,6 @@ export class Session {
     excludeTools = [
         "ask_user_question"
     ];
-
-    eventEmitter = new EventEmitter();
-
-    TOOL_MAX_LINE_SIZE = 65;
-
-    messages = [];
-
-    fileLogger;
 
     limitString(str, max_size) {
         let result = str;
@@ -81,29 +78,54 @@ export class Session {
         this.sessionPath = await this.getSessionPath();
     }
 
-    async getSessionPath() {
+    async rpcCall(args) {
+        const chunkProcessor = new ChunkProcessor();
         const analyzeChunk = (chunk) => { 
-            const records = this.chunkProcessor.getRecords(chunk);
+            const records = chunkProcessor.getRecords(chunk);
             for (const record of records) {
-                if (record.type === "response" && record.command === "get_state") {
-                    this.eventEmitter.emit("session", record.data?.sessionFile);
+                if (record.type === "response" && record.command === args.type) {
+                    this.eventEmitter.emit(args.type, record);
                 }
             }
         };
-        this.piProcess.stdout.on("data", analyzeChunk);
         if (this.exited) {
-            throw new Error("Cannot get session path: session already exited");
+            throw new Error(`RPC call failed (${args.type}): session already exited`);
         }
-        this.piProcess.stdin.write('{"type": "get_state"}\n');
-        const [type, [payload]] = await Promise.race([
-            once(this.eventEmitter, "session").then(p => ["session", p]),
-            once(this.eventEmitter, "exit").then(p => ["exit", p])
-        ]);
-        this.piProcess.stdout.off("data", analyzeChunk);
-        if (type !== "session") {
-            throw new Error(`Cannot get session path (exit: ${payload})`);
+        let stdinError;
+        const stdinListener = (err) => stdinError = err;
+        this.piProcess.stdout.on("data", analyzeChunk);
+        this.piProcess.stdin.on("error", stdinListener);
+        let type;
+        let payload;
+        try {
+            this.piProcess.stdin.write(`${JSON.stringify(args)}\n`);
+            [type, [payload]] = await Promise.race([
+                once(this.eventEmitter, args.type).then(p => [args.type, p]),
+                once(this.eventEmitter, "exit").then(p => ["exit", p])
+            ]);
+        } finally {
+            this.piProcess.stdin.off("error", stdinListener);
+            this.piProcess.stdout.off("data", analyzeChunk);
         }
-        return payload;
+        if (type !== args.type) {
+            if (stdinError) {
+                throw new Error(`RPC call failed (${args.type}): stdin: ${stdinError.message}`);
+            }
+            const exitCode = payload;
+            throw new Error(`RPC call failed (${args.type}): exit: ${exitCode}`);
+        }
+        const response = payload;
+        if (!response.success) {
+            throw new Error(`RPC call failed (${args.type}): ${response.error}`);
+        }
+        return response.data;
+    }
+
+    async getSessionPath() {
+        const args = {
+            type: "get_state"
+        };
+        return await this.rpcCall(args).sessionFile;
     }
 
     terminalLog(text, color) {
@@ -203,14 +225,30 @@ export class Session {
         }
     }
 
-    steer(message) {
-        const steer = {
+    async steer(message) {
+        const args = {
             id: `steer-${this.steerCount + 1}`,
             type: "steer",
             message: message
         };
-        this.piProcess.stdin.write(JSON.stringify(steer) + '\n');
         this.steerCount++;
+        const disposition = await this.rpcCall(args).disposition;
+        this.terminalLog(`Steer ${disposition}`);
+    }
+
+    async newSession() {
+        const args = {
+            type: "new_session",
+            parentSession: this.sessionPath
+        };
+        const cancelled = await this.rpcCall(args).cancelled;
+        if (cancelled) {
+            throw new Error("New session is cancelled");
+        }
+        this.steerCount = 0;
+        this.messages.length = 0;
+        this.settled = false;
+        this.sessionPath = await this.getSessionPath();
     }
 
     onSettle() {

@@ -25,7 +25,8 @@ export class Run {
     setJudgeTimer(cycleTime) {
         clearTimeout(this.judgeTimer);
         this.judgeTimer = setTimeout(() => {
-            this.processJudgeCycle();
+            this.processJudgeCycle()
+                .catch(err => TerminalLogger.writeLine(`Judge cycle error: ${err.message}`, TerminalLogger.COLOR_ERROR));
         }, cycleTime * 1000);
     }
 
@@ -80,7 +81,11 @@ export class Run {
                 // skip
             } else if (decision === "NUDGE") {
                 if (!this.worker.settled && !this.worker.exited && decisionText)  {
-                    this.worker.steer(decisionText);
+                    try {
+                        await this.worker.steer(decisionText);
+                    } catch(err) {
+                        TerminalLogger.writeLine(`NUDGE failed: ${err.message}`, TerminalLogger.COLOR_ERROR);
+                    }
                 }
             } else if (decision === "DISTILL") {
                 // todo
