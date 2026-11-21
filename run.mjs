@@ -31,9 +31,13 @@ export class Run {
     }
 
     async processJudgeCycle() {
+        // start Judge process
         TerminalLogger.writeLine("Starting Judge process...", TerminalLogger.COLOR_DIM);
         const judge = new Judge(this.judgeFileLogger);
         judge.start(this.taskPath, this.workerSessionPath);
+
+        // wait for it
+        let verdict;
         let timer;
         const timeout = new Promise((_, reject) => {
             timer = setTimeout(() => reject(new Error("Timeout exceeded")), 30 * 60 * 1000);
@@ -48,7 +52,8 @@ export class Run {
                 timeout
             ]);
             if (type === "done") {
-                TerminalLogger.writeLine(`Judge verdict: ${payload}`);
+                verdict = payload;
+                TerminalLogger.writeLine(`Judge verdict: ${verdict}`);
             } else if (type === "exit") {
                 if (payload === null) {
                     TerminalLogger.writeLine("Judge process failed to start", TerminalLogger.COLOR_ERROR);
@@ -62,6 +67,28 @@ export class Run {
         } finally {
             clearTimeout(timer);
         }
+
+        // act on verdict
+        if (verdict) {
+            const colonIndex = verdict.indexOf(':');
+            const decision = (colonIndex === -1 ? verdict : verdict.slice(0, colonIndex)).trim();
+            const decisionText = colonIndex === -1 ? "" : verdict.slice(colonIndex + 1).trim();
+            if (decision === "OK") {
+                // skip
+            } else if (decision === "NUDGE") {
+                if (!this.worker.settled && !this.worker.exited && decisionText)  {
+                    this.worker.steer(decisionText);
+                }
+            } else if (decision === "DISTILL") {
+                // todo
+            } else if (decision === "STOP") {
+                // todo
+            } else if (decision === "ERROR") {
+                // skip
+            } else {
+                TerminalLogger.writeLine("Judge decision could not be parsed", TerminalLogger.COLOR_ERROR);
+            }
+        }
     }
 
     async launch() {
@@ -69,7 +96,7 @@ export class Run {
         this.worker = new Worker(this.workerFileLogger);
         this.workerSessionPath = await this.worker.getSessionPath();
         // this.setJudgeTimer(this.judgeCycleTime);
-        this.setJudgeTimer(0);
+        this.setJudgeTimer(0); // for now fires once at the beginning
         this.worker.start(this.taskPath);
     }
 

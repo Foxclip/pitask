@@ -9,7 +9,9 @@ export class Session {
     chunkProcessor;
     piProcess;
     sessionType;
+    settled = false; // currently is not reset anywhere
     exited = false;
+    steerCount = 0;
 
     // these record types are not fully logged because their data is
     // already contained in other types
@@ -198,7 +200,19 @@ export class Session {
         }
     }
 
-    onSettle() {  }
+    steer(message) {
+        const steer = {
+            id: `steer-${this.steerCount + 1}`,
+            type: "steer",
+            message: message
+        };
+        this.piProcess.stdin.write(JSON.stringify(steer) + '\n');
+        this.steerCount++;
+    }
+
+    onSettle() {
+        this.settled = true;
+    }
 
     onClose(code, signal) {
         this.tryTriggerExit(signal ? `killed by ${signal}` : code);

@@ -64,6 +64,7 @@ Any other final line is treated as OK. Do NOT end with anything after the DECISI
     }
 
     onSettle(code) {
+        super.onSettle(code);
         if (this.messages.length > 0) {
             const lastMessage = this.messages.at(-1);
             const messageTrimmed = lastMessage.trimEnd();
