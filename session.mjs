@@ -97,13 +97,16 @@ export class Session {
         this.piProcess.stdin.on("error", stdinListener);
         let type;
         let payload;
+        // aborting removes the losing `once` listener
+        const ac = new AbortController();
         try {
             this.piProcess.stdin.write(`${JSON.stringify(args)}\n`);
             [type, [payload]] = await Promise.race([
-                once(this.eventEmitter, args.type).then(p => [args.type, p]),
-                once(this.eventEmitter, "exit").then(p => ["exit", p])
+                once(this.eventEmitter, args.type, { signal: ac.signal }).then(p => [args.type, p]),
+                once(this.eventEmitter, "exit", { signal: ac.signal }).then(p => ["exit", p])
             ]);
         } finally {
+            ac.abort();
             this.piProcess.stdin.off("error", stdinListener);
             this.piProcess.stdout.off("data", analyzeChunk);
         }

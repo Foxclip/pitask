@@ -37,20 +37,24 @@ export class Run {
 
         // wait for it
         let verdict;
-        let timer;
-        const timeout = new Promise((_, reject) => {
-            timer = setTimeout(() => reject(new Error("Timeout exceeded")), 30 * 60 * 1000);
-        });
         try {
             await judge.start(this.taskPath, this.worker.sessionPath);
             if (judge.exited) {
                 throw new Error("Judge exited already");
             }
-            const [type, [payload]] = await Promise.race([
-                once(judge.eventEmitter, "done").then(p => ["done", p]),
-                once(judge.eventEmitter, "exit").then(p => ["exit", p]),
-                timeout
-            ]);
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(new Error("Timeout exceeded")), 30 * 60 * 1000);
+            let type;
+            let payload;
+            try {
+                [type, [payload]] = await Promise.race([
+                    once(judge.eventEmitter, "done", { signal: ac.signal }).then(p => ["done", p]),
+                    once(judge.eventEmitter, "exit", { signal: ac.signal }).then(p => ["exit", p]),
+                ]);
+            } finally {
+                clearTimeout(timer);
+                ac.abort();
+            }
             if (type === "done") {
                 verdict = payload;
                 TerminalLogger.writeLine(`Judge verdict: ${verdict}`);
@@ -68,8 +72,6 @@ export class Run {
                 judge.killProcess();
                 TerminalLogger.writeLine(`Judge error: ${error.message}`, TerminalLogger.COLOR_ERROR);
             }
-        } finally {
-            clearTimeout(timer);
         }
 
         // act on verdict
