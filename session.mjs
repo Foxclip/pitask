@@ -78,7 +78,7 @@ export class Session {
         this.sessionPath = await this.getSessionPath();
     }
 
-    async rpcCall(args) {
+    async rpcCall(args, timeoutMs = 10 * 60 * 1000) {
         const chunkProcessor = new ChunkProcessor();
         const analyzeChunk = (chunk) => { 
             const records = chunkProcessor.getRecords(chunk);
@@ -95,17 +95,28 @@ export class Session {
         const stdinListener = (err) => stdinError = err;
         this.piProcess.stdout.on("data", analyzeChunk);
         this.piProcess.stdin.on("error", stdinListener);
-        let type;
-        let payload;
         // aborting removes the losing `once` listener
         const ac = new AbortController();
+        let timedOut = false;
+        const timer = setTimeout(() => {
+            timedOut = true;
+            ac.abort();
+        }, timeoutMs);
+        let type;
+        let payload;
         try {
             this.piProcess.stdin.write(`${JSON.stringify(args)}\n`);
             [type, [payload]] = await Promise.race([
                 once(this.eventEmitter, args.type, { signal: ac.signal }).then(p => [args.type, p]),
                 once(this.eventEmitter, "exit", { signal: ac.signal }).then(p => ["exit", p])
             ]);
+        } catch (err) {
+            if (timedOut) {
+                throw new Error(`RPC call timed out after ${timeoutMs / 1000}s (${args.type})`);
+            }
+            throw err;
         } finally {
+            clearTimeout(timer);
             ac.abort();
             this.piProcess.stdin.off("error", stdinListener);
             this.piProcess.stdout.off("data", analyzeChunk);
