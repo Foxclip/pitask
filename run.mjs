@@ -12,11 +12,13 @@ export class Run {
     worker;
     judgeCycleTime;
     judgeTimer;
+    terminalLogger;
     judgeFileLogger;
     workerFileLogger;
 
     constructor(runDir, taskPath, judgeCycleTime) {
         this.runDir = runDir;
+        this.terminalLogger = new TerminalLogger(`${runDir}/terminal.log`);
         this.judgeFileLogger = new FileLogger(`${runDir}/judge.log`);
         this.workerFileLogger = new FileLogger(`${runDir}/worker.log`);
         this.taskPath = taskPath;
@@ -27,14 +29,14 @@ export class Run {
         clearTimeout(this.judgeTimer);
         this.judgeTimer = setTimeout(() => {
             this.processJudgeCycle()
-                .catch(err => TerminalLogger.writeLine(`Judge cycle error: ${err.message}`, TerminalLogger.COLOR_ERROR));
+                .catch(err => this.terminalLogger.logError(`Judge cycle error: ${err.message}`));
         }, cycleTime * 1000);
     }
 
     async processJudgeCycle() {
         // start Judge process
-        TerminalLogger.writeLine("Starting Judge process...", TerminalLogger.COLOR_DIM);
-        const judge = new Judge(this.judgeFileLogger);
+        this.terminalLogger.logDim("Starting Judge process...");
+        const judge = new Judge(this.terminalLogger, this.judgeFileLogger);
 
         // wait for it
         let verdict;
@@ -53,20 +55,20 @@ export class Run {
             );
             if (type === "done") {
                 verdict = payload[0];
-                TerminalLogger.writeLine(`Judge verdict: ${verdict}`);
+                this.terminalLogger.logNormal(`Judge verdict: ${verdict}`);
             } else if (type === "exit") {
                 if (payload[0] === null) {
-                    TerminalLogger.writeLine("Judge process failed to start", TerminalLogger.COLOR_ERROR);
+                    this.terminalLogger.logError("Judge process failed to start");
                 } else {
-                    TerminalLogger.writeLine(`Judge exited: ${payload[0]}`);
+                    this.terminalLogger.logNormal(`Judge exited: ${payload[0]}`);
                 }
             }
         } catch (error) {
             if (judge.exited) {
-                TerminalLogger.writeLine("Judge process failed to start", TerminalLogger.COLOR_ERROR);
+                this.terminalLogger.logError("Judge process failed to start");
             } else {
                 judge.killProcess();
-                TerminalLogger.writeLine(`Judge error: ${error.message}`, TerminalLogger.COLOR_ERROR);
+                this.terminalLogger.logError(`Judge error: ${error.message}`);
             }
         }
 
@@ -82,7 +84,7 @@ export class Run {
                     try {
                         await this.worker.steer(decisionText);
                     } catch(err) {
-                        TerminalLogger.writeLine(`NUDGE failed: ${err.message}`, TerminalLogger.COLOR_ERROR);
+                        this.terminalLogger.logError(`NUDGE failed: ${err.message}`);
                     }
                 }
             } else if (decision === "DISTILL") {
@@ -92,23 +94,23 @@ export class Run {
             } else if (decision === "ERROR") {
                 // skip
             } else {
-                TerminalLogger.writeLine("Judge decision could not be parsed", TerminalLogger.COLOR_ERROR);
+                this.terminalLogger.logError("Judge decision could not be parsed");
             }
         }
     }
 
     async launch() {
-        TerminalLogger.writeLine("Starting Worker process...", TerminalLogger.COLOR_DIM);
+        this.terminalLogger.logDim("Starting Worker process...");
         const taskText = readFileSync(this.taskPath, "utf8");
-        this.worker = new Worker(this.workerFileLogger);
+        this.worker = new Worker(this.terminalLogger, this.workerFileLogger);
         try {
             await this.worker.start(taskText);
         } catch (error) {
             if (this.worker.exited) {
-                TerminalLogger.writeLine("Worker process failed to start", TerminalLogger.COLOR_ERROR);
+                this.terminalLogger.logError("Worker process failed to start");
             } else {
                 this.worker.killProcess();
-                TerminalLogger.writeLine(`Worker error: ${error.message}`, TerminalLogger.COLOR_ERROR);
+                this.terminalLogger.logError(`Worker error: ${error.message}`);
             }
             return;
         }

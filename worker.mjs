@@ -2,8 +2,8 @@ import { Session } from "./session.mjs";
 
 export class Worker extends Session {
 
-    constructor(fileLogger) {
-        super("Worker", fileLogger);
+    constructor(terminalLogger, fileLogger) {
+        super("Worker", terminalLogger, fileLogger);
     }
 
     async start(taskText) {

@@ -18,6 +18,9 @@ export class FileLogger {
     }
 
     writeLine(line) {
+        if (!line) {
+            return;
+        }
         this.writeIsoTime();
         this.write(" ");
         this.write(`${line}\n`);

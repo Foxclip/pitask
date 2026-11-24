@@ -1,13 +1,12 @@
 import { Session } from "./session.mjs";
-import { TerminalLogger } from "./terminal_logger.mjs";
 
 export class Judge extends Session {
 
     prompt;
     verdict;
 
-    constructor(fileLogger) {
-        super("Judge", fileLogger, [
+    constructor(terminalLogger, fileLogger) {
+        super("Judge", terminalLogger, fileLogger, [
             "ask_user_question",
             "edit",
             "write"

@@ -68,4 +68,3 @@ const run = new Run(runDir, taskPath, judgeCycleTime);
 await run.launch();
 
 // TODO: implement DISTILL verdict
-// TODO: log terminal output to file

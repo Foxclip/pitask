@@ -1,5 +1,4 @@
 import { spawn } from 'child_process';
-import { TerminalLogger } from './terminal_logger.mjs';
 import { FileLogger } from './file_logger.mjs';
 import { EventEmitter } from 'events';
 import { ChunkProcessor } from './chunk_processor.mjs';
@@ -19,6 +18,7 @@ export class Session {
     steerCount = 0;
     messages = [];
     eventEmitter = new EventEmitter();
+    terminalLogger;
     fileLogger;
     rpcCallId = 0;
 
@@ -49,9 +49,10 @@ export class Session {
         return result;
     }
 
-    constructor(sessionType, fileLogger, excludeTools) {
+    constructor(sessionType, terminalLogger, fileLogger, excludeTools) {
 
         this.sessionType = sessionType;
+        this.terminalLogger = terminalLogger;
         this.fileLogger = fileLogger;
         if (excludeTools) {
             this.excludeTools = excludeTools;
@@ -71,7 +72,7 @@ export class Session {
         }
 
         // event setup
-        this.chunkProcessor = new ChunkProcessor();
+        this.chunkProcessor = new ChunkProcessor(this.terminalLogger);
         this.piProcess.stdout.on('data', (chunk) => this.onDataArrive(chunk));
         this.piProcess.on('close', (code, signal) => { this.onClose(code, signal); });
         this.piProcess.on('error', (err) => { this.onError(err); });
@@ -85,7 +86,7 @@ export class Session {
         if (!args.id) {
             args.id = `rpc-${++this.rpcCallId}`;
         }
-        const chunkProcessor = new ChunkProcessor();
+        const chunkProcessor = new ChunkProcessor(this.terminalLogger);
         const analyzeChunk = (chunk) => { 
             const records = chunkProcessor.getRecords(chunk);
             for (const record of records) {
@@ -137,14 +138,6 @@ export class Session {
         return (await this.rpcCall(args)).sessionFile;
     }
 
-    terminalLog(text, color) {
-        TerminalLogger.writeLine(text, color);
-    }
-
-    fileLog(text) {
-        this.fileLogger.writeLine(text);
-    }
-
     onDataArrive(chunk) {
         const records = this.chunkProcessor.getRecords(chunk);
         for (const record of records) {
@@ -153,9 +146,9 @@ export class Session {
             if (this.fileLogger) {
                 if (!this.skippedRecords.includes(record.type)) {
                     if (!this.lightRecords.includes(record.type)) {
-                        this.fileLog(JSON.stringify(record));
+                        this.fileLogger.writeLine(JSON.stringify(record));
                     } else {
-                        this.fileLog(`{"type": "${record.type}"}`);
+                        this.fileLogger.writeLine(`{"type": "${record.type}"}`);
                     }
                 }
             }
@@ -163,9 +156,9 @@ export class Session {
             if (record.type === 'message_update') {
                 const amEvent = record.assistantMessageEvent;
                 if (amEvent && amEvent.type === 'thinking_start') {
-                    this.terminalLog(`[${this.sessionType}]: thinking...`, TerminalLogger.COLOR_DIM);
+                    this.terminalLogger.logDim(`[${this.sessionType}]: thinking...`);
                 } else if (amEvent && amEvent.type === 'text_start') {
-                    this.terminalLog(`[${this.sessionType}]: writing message...`, TerminalLogger.COLOR_DIM);
+                    this.terminalLogger.logDim(`[${this.sessionType}]: writing message...`);
                 }
             } else if (record.type === "tool_execution_start") {
                 const toolName = record.toolName;
@@ -174,13 +167,13 @@ export class Session {
                     const argValue = record.args[argName];
                     const toolStr = `[${this.sessionType}]: ${toolName}: ${argName}: ${argValue}`;
                     const toolStrLimited = this.limitString(toolStr, this.TOOL_MAX_LINE_SIZE);
-                    this.terminalLog(toolStrLimited);
+                    this.terminalLogger.logNormal(toolStrLimited);
                 } else {
-                    this.terminalLog(`[${this.sessionType}]: ${toolName}:`);
+                    this.terminalLogger.logNormal(`[${this.sessionType}]: ${toolName}:`);
                     for (const [key, value] of Object.entries(record.args)) {
                         const commandStr = `    ${key}: ${value}`;
                         const commandStrLimited = this.limitString(commandStr, this.TOOL_MAX_LINE_SIZE);
-                        this.terminalLog(commandStrLimited);
+                        this.terminalLogger.logNormal(commandStrLimited);
                     }
                 }
             } else if (record.type === 'message_end') {
@@ -208,7 +201,7 @@ export class Session {
                             }
                         }
                         if (text) {
-                            this.terminalLog(`[${this.sessionType}]: \n${text}`);
+                            this.terminalLogger.logNormal(`[${this.sessionType}]: \n${text}`);
                             this.messages.push(text);
                         }
                         if (toolName) {
@@ -216,15 +209,15 @@ export class Session {
                         }
                         if (!text && !toolName) {
                             if (thinking) {
-                                this.terminalLog(`[${this.sessionType}]: <thinking only>`, TerminalLogger.COLOR_DIM);
+                                this.terminalLogger.logDim(`[${this.sessionType}]: <thinking only>`);
                             } else {
-                                this.terminalLog(`[${this.sessionType}]: ### NO CONTENT ###`);
+                                this.terminalLogger.logNormal(`[${this.sessionType}]: ### NO CONTENT ###`);
                             }
                         }
                     } else if (message.errorMessage) {
-                        this.terminalLog(`[${this.sessionType}]: ${message.errorMessage}`, TerminalLogger.COLOR_ERROR);
+                        this.terminalLogger.logError(`[${this.sessionType}]: ${message.errorMessage}`);
                     } else {
-                        this.terminalLog(`[${this.sessionType}]: ${JSON.stringify(record)}`, TerminalLogger.COLOR_DIM);
+                        this.terminalLogger.logDim(`[${this.sessionType}]: ${JSON.stringify(record)}`);
                     }
                 }
             } else if (record.type === 'agent_settled') {
@@ -242,7 +235,7 @@ export class Session {
         };
         this.steerCount++;
         const disposition = (await this.rpcCall(args)).disposition;
-        this.terminalLog(`Steer ${disposition}`);
+        this.terminalLogger.logNormal(`Steer ${disposition}`);
     }
 
     async newSession() {
@@ -269,7 +262,7 @@ export class Session {
     }
 
     onError(err) {
-        this.terminalLog(`Failed to start ${this.sessionType} Pi process. Is the "pi" CLI installed and in your PATH? Error: ${err.message}`, TerminalLogger.COLOR_ERROR);
+        this.terminalLogger.logError(`Failed to start ${this.sessionType} Pi process. Is the "pi" CLI installed and in your PATH? Error: ${err.message}`);
         this.tryTriggerExit(null);
     }
 
@@ -278,7 +271,7 @@ export class Session {
     }
 
     quit() {
-        this.terminalLog(`Shutting down ${this.sessionType} process...`, TerminalLogger.COLOR_DIM);
+        this.terminalLogger.logDim(`Shutting down ${this.sessionType} process...`);
         this.piProcess.stdin.end();
     }
 

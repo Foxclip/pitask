@@ -1,8 +1,11 @@
-import { TerminalLogger } from "./terminal_logger.mjs";
-
 export class ChunkProcessor {
 
+    terminalLogger;
     lineBuffer = "";
+
+    constructor(terminalLogger) {
+        this.terminalLogger = terminalLogger;
+    }
 
     getRecords(chunk) {
         this.lineBuffer += chunk.toString('utf8');
@@ -24,7 +27,7 @@ export class ChunkProcessor {
                 record = JSON.parse(line);
                 records.push(record);
             } catch (err) {
-                TerminalLogger.writeLine(`Failed to parse JSON record: ${line}`, TerminalLogger.COLOR_ERROR);
+                this.terminalLogger.logError(`Failed to parse JSON record: ${line}`);
             }
         }
         return records;

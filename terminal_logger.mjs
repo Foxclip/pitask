@@ -1,11 +1,18 @@
 import { styleText } from "node:util";
+import { FileLogger } from "./file_logger.mjs";
 
 export class TerminalLogger {
 
     static COLOR_DIM = "#777777";
     static COLOR_ERROR = "red";
+
+    fileLogger;
+
+    constructor(logFilename) {
+        this.fileLogger = new FileLogger(logFilename);
+    }
     
-    static getCurrentTimeString() {
+    getCurrentTimeString() {
         const now = new Date();
         const pad = (n) => String(n).padStart(2, '0');
         const hours = pad(now.getHours());
@@ -14,7 +21,7 @@ export class TerminalLogger {
         return `${hours}:${minutes}:${seconds}`;
     }
 
-    static write(text, color) {
+    write(text, color) {
         if (color) {
             process.stdout.write(styleText(color, text));
         } else {
@@ -22,11 +29,11 @@ export class TerminalLogger {
         }
     }
 
-    static writeTime(color) {
-        this.write(`[${this.getCurrentTimeString()}]`, color ?? this.COLOR_DIM);
+    writeTime(color) {
+        this.write(`[${this.getCurrentTimeString()}]`, color ?? TerminalLogger.COLOR_DIM);
     }
 
-    static writeLine(line, color) {
+    writeLine(line, color) {
         this.writeTime();
         this.write(" ");
         if (line) {
@@ -34,6 +41,23 @@ export class TerminalLogger {
         } else {
             this.write("\n", color);
         }
+
+        this.fileLogger.writeLine(line);
+    }
+
+    logNormal(line) {
+        line ??= "";
+        this.writeLine(line);
+    }
+
+    logDim(line) {
+        line ??= "";
+        this.writeLine(line, TerminalLogger.COLOR_DIM);
+    }
+
+    logError(line) {
+        line ??= "";
+        this.writeLine(line, TerminalLogger.COLOR_ERROR);
     }
 
 }
