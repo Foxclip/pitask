@@ -19,6 +19,7 @@ export class Session {
     messages = [];
     eventEmitter = new EventEmitter();
     fileLogger;
+    rpcCallId = 0;
 
     // these record types are not fully logged because their data is
     // already contained in other types
@@ -80,11 +81,14 @@ export class Session {
     }
 
     async rpcCall(args, timeoutMs = 10 * 60 * 1000) {
+        if (!args.id) {
+            args.id = `rpc-${++this.rpcCallId}`;
+        }
         const chunkProcessor = new ChunkProcessor();
         const analyzeChunk = (chunk) => { 
             const records = chunkProcessor.getRecords(chunk);
             for (const record of records) {
-                if (record.type === "response" && record.command === args.type) {
+                if (record.type === "response" && record.command === args.type && record.id === args.id) {
                     this.eventEmitter.emit(args.type, record);
                 }
             }
