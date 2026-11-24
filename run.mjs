@@ -3,6 +3,7 @@ import { Judge } from './judge.mjs';
 import { TerminalLogger } from './terminal_logger.mjs';
 import { FileLogger } from './file_logger.mjs';
 import { raceEvents } from './common.mjs';
+import { readFileSync } from 'node:fs';
 
 export class Run {
 
@@ -98,9 +99,20 @@ export class Run {
 
     async launch() {
         TerminalLogger.writeLine("Starting Worker process...", TerminalLogger.COLOR_DIM);
+        const taskText = readFileSync(this.taskPath, "utf8");
         this.worker = new Worker(this.workerFileLogger);
         // this.setJudgeTimer(this.judgeCycleTime);
-        await this.worker.start(this.taskPath);
+        try {
+            await this.worker.start(taskText);
+        } catch (error) {
+            if (this.worker.exited) {
+                TerminalLogger.writeLine("Worker process failed to start", TerminalLogger.COLOR_ERROR);
+            } else {
+                this.worker.killProcess();
+                TerminalLogger.writeLine(`Worker error: ${error.message}`, TerminalLogger.COLOR_ERROR);
+            }
+            return;
+        }
         this.setJudgeTimer(0); // for now fires once at the beginning
     }
 

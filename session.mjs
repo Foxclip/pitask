@@ -15,6 +15,7 @@ export class Session {
     sessionType;
     settled = false;
     exited = false;
+    promptCount = 0;
     steerCount = 0;
     messages = [];
     eventEmitter = new EventEmitter();
