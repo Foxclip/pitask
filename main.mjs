@@ -1,6 +1,6 @@
 import { Run } from './run.mjs';
 import { parseArgs } from "node:util";
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, copyFileSync, writeFileSync, statSync } from 'node:fs';
 
 const PITASK_DIR_NAME = ".pitask";
 
@@ -24,13 +24,16 @@ const { values: cmdArgs } = parseArgs({
 const judgeCycleTime = durationToSeconds(cmdArgs.cycle);
 
 // check task file
-if (!existsSync(cmdArgs.task)) {
+if (!statSync(cmdArgs.task).isFile()) {
     throw new Error(`${cmdArgs.task} does not exist`);
 }
 
+// create pitask folder
+mkdirSync(PITASK_DIR_NAME);
+
 // create run folder
 const runsDir = `${PITASK_DIR_NAME}/runs`;
-mkdirSync(runsDir, { recursive: true });
+mkdirSync(runsDir);
 let runN = 1;
 for (const entry of readdirSync(runsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) {
@@ -43,6 +46,17 @@ for (const entry of readdirSync(runsDir, { withFileTypes: true })) {
 }
 const runDir = `${runsDir}/run${runN}`;
 mkdirSync(runDir);
+
+// write metadata file
+const metadata = {
+    startupTimeIso: new Date().toISOString(),
+    taskPath: cmdArgs.task,
+    judgeCycleTime: cmdArgs.cycle
+}
+writeFileSync(`${runDir}/meta.json`, JSON.stringify(metadata, null, 4));
+
+// copy task file
+copyFileSync(cmdArgs.task, `${runDir}/TASK.md`);
 
 // launch run
 const run = new Run(runDir, cmdArgs.task, judgeCycleTime);
