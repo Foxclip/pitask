@@ -29,11 +29,11 @@ if (!statSync(cmdArgs.task).isFile()) {
 }
 
 // create pitask folder
-mkdirSync(PITASK_DIR_NAME);
+mkdirSync(PITASK_DIR_NAME, { recursive: true });
 
 // create run folder
 const runsDir = `${PITASK_DIR_NAME}/runs`;
-mkdirSync(runsDir);
+mkdirSync(runsDir, { recursive: true });
 let runN = 1;
 for (const entry of readdirSync(runsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) {
