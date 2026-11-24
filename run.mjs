@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 
 export class Run {
 
+    runDir;
     taskPath;
     worker;
     judgeCycleTime;
@@ -14,11 +15,10 @@ export class Run {
     judgeFileLogger;
     workerFileLogger;
 
-    constructor(taskPath, judgeCycleTime) {
-        this.judgeFileLogger = new FileLogger("judge.log");
-        this.judgeFileLogger.clearLogFile();
-        this.workerFileLogger = new FileLogger("worker.log");
-        this.workerFileLogger.clearLogFile();
+    constructor(runDir, taskPath, judgeCycleTime) {
+        this.runDir = runDir;
+        this.judgeFileLogger = new FileLogger(`${runDir}/judge.log`);
+        this.workerFileLogger = new FileLogger(`${runDir}/worker.log`);
         this.taskPath = taskPath;
         this.judgeCycleTime = judgeCycleTime;
     }

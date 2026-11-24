@@ -1,4 +1,4 @@
-import { writeFileSync, appendFileSync } from "fs";
+import { appendFileSync } from "fs";
 
 export class FileLogger {
 
@@ -6,10 +6,6 @@ export class FileLogger {
 
     constructor(filename) {
         this.filename = filename;   
-    }
-    
-    clearLogFile() {
-        writeFileSync(this.filename, "", "utf8");
     }
 
     write(text) {
