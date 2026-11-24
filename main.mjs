@@ -1,6 +1,7 @@
 import { Run } from './run.mjs';
 import { parseArgs } from "node:util";
-import { mkdirSync, readdirSync, copyFileSync, writeFileSync, statSync } from 'node:fs';
+import { mkdirSync, readdirSync, copyFileSync, writeFileSync, statSync, existsSync } from 'node:fs';
+import path from 'node:path';
 
 const PITASK_DIR_NAME = ".pitask";
 
@@ -21,11 +22,15 @@ const { values: cmdArgs } = parseArgs({
         cycle: { type: "string", default: "20m" }
     }
 });
+const taskPath = path.resolve(cmdArgs.task);
 const judgeCycleTime = durationToSeconds(cmdArgs.cycle);
 
 // check task file
-if (!statSync(cmdArgs.task).isFile()) {
-    throw new Error(`${cmdArgs.task} does not exist`);
+if (!existsSync(taskPath)) {
+    throw new Error(`${taskPath} does not exist`);
+}
+if (!statSync(taskPath).isFile()) {
+    throw new Error(`${taskPath} is not a file`);
 }
 
 // create pitask folder
@@ -44,22 +49,22 @@ for (const entry of readdirSync(runsDir, { withFileTypes: true })) {
         runN = Math.max(runN, Number(match[1]) + 1);
     }
 }
-const runDir = `${runsDir}/run${runN}`;
+const runDir = path.resolve(`${runsDir}/run${runN}`);
 mkdirSync(runDir);
 
 // write metadata file
 const metadata = {
     startupTimeIso: new Date().toISOString(),
-    taskPath: cmdArgs.task,
+    taskPath: taskPath,
     judgeCycleTime: cmdArgs.cycle
 }
 writeFileSync(`${runDir}/meta.json`, JSON.stringify(metadata, null, 4));
 
 // copy task file
-copyFileSync(cmdArgs.task, `${runDir}/TASK.md`);
+copyFileSync(taskPath, `${runDir}/TASK.md`);
 
 // launch run
-const run = new Run(runDir, cmdArgs.task, judgeCycleTime);
+const run = new Run(runDir, taskPath, judgeCycleTime);
 await run.launch();
 
 // TODO: implement DISTILL verdict

@@ -14,22 +14,24 @@ export class Judge extends Session {
         ]);
     }
 
-    async start(taskPath, workerSessionPath) {
+    async start(runDir, taskPath, workerSessionPath) {
 
         await super.start();
 
         this.prompt = `You are one cycle of the judge for a pitask run: a pi worker agent executing the task in ${taskPath}.
 You are STATELESS: your only context is what you read from disk right now. Do not assume anything from a previous cycle — the loop keeps its memory in files, not in you.
 
+Current working directory: ${process.cwd()}
+Run logs/metadata directory: ${runDir}
 Worker session file: ${workerSessionPath}
 
 Read (budget: AT MOST 4 tool calls, use tail/jq — you are one cycle of many and
 speed matters more than depth):
-1. Worker session file above — the worker's live transcript (JSONL, one record
+1. ${taskPath} — the task the worker is supposed to complete
+2. Worker session file above — the worker's live transcript (JSONL, one record
    per line, lines can be long). Tail the end to see what it has been doing:
    assistant messages, tool calls, results. If it is missing or empty, the
    worker just started — that is OK.
-2. ${taskPath} — the task the worker is supposed to complete
 
 The loop already checked deterministic health (worker process liveness) and
 would have ended the run if the worker died. Being asked means: the worker is

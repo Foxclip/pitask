@@ -39,7 +39,7 @@ export class Run {
         // wait for it
         let verdict;
         try {
-            await judge.start(this.taskPath, this.worker.sessionPath);
+            await judge.start(this.runDir, this.taskPath, this.worker.sessionPath);
             if (judge.exited) {
                 throw new Error("Judge exited already");
             }
