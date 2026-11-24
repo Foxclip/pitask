@@ -23,7 +23,6 @@ const judgeCycleTime = durationToSeconds(cmdArgs.cycle);
 const run = new Run(cmdArgs.task, judgeCycleTime);
 await run.launch();
 
-// TODO: fix timeout message in processJudgeCycle
 // TODO: pass id in rpc calls, and check them in analyzeChunk
 // TODO: make Worker.start use Session.rpcCall
 // TODO: implement DISTILL verdict

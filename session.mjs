@@ -1,8 +1,9 @@
 import { spawn } from 'child_process';
 import { TerminalLogger } from './terminal_logger.mjs';
 import { FileLogger } from './file_logger.mjs';
-import { EventEmitter, once } from 'events';
+import { EventEmitter } from 'events';
 import { ChunkProcessor } from './chunk_processor.mjs';
+import { raceEvents } from './common.mjs';
 
 export class Session {
 
@@ -95,29 +96,18 @@ export class Session {
         const stdinListener = (err) => stdinError = err;
         this.piProcess.stdout.on("data", analyzeChunk);
         this.piProcess.stdin.on("error", stdinListener);
-        // aborting removes the losing `once` listener
-        const ac = new AbortController();
-        let timedOut = false;
-        const timer = setTimeout(() => {
-            timedOut = true;
-            ac.abort();
-        }, timeoutMs);
-        let type;
-        let payload;
+        let type, payload;
         try {
             this.piProcess.stdin.write(`${JSON.stringify(args)}\n`);
-            [type, [payload]] = await Promise.race([
-                once(this.eventEmitter, args.type, { signal: ac.signal }).then(p => [args.type, p]),
-                once(this.eventEmitter, "exit", { signal: ac.signal }).then(p => ["exit", p])
-            ]);
-        } catch (err) {
-            if (timedOut) {
-                throw new Error(`RPC call timed out after ${timeoutMs / 1000}s (${args.type})`);
-            }
-            throw err;
+            [type, payload] = await raceEvents(
+                [
+                    { emitter: this.eventEmitter, eventName: args.type },
+                    { emitter: this.eventEmitter, eventName: "exit" }
+                ],
+                timeoutMs,
+                `RPC call timed out after ${timeoutMs / 1000}s (${args.type})`
+            );
         } finally {
-            clearTimeout(timer);
-            ac.abort();
             this.piProcess.stdin.off("error", stdinListener);
             this.piProcess.stdout.off("data", analyzeChunk);
         }
@@ -125,10 +115,10 @@ export class Session {
             if (stdinError) {
                 throw new Error(`RPC call failed (${args.type}): stdin: ${stdinError.message}`);
             }
-            const exitCode = payload;
+            const exitCode = payload[0];
             throw new Error(`RPC call failed (${args.type}): exit: ${exitCode}`);
         }
-        const response = payload;
+        const response = payload[0];
         if (!response.success) {
             throw new Error(`RPC call failed (${args.type}): ${response.error}`);
         }

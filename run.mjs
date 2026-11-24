@@ -2,7 +2,7 @@ import { Worker } from './worker.mjs';
 import { Judge } from './judge.mjs';
 import { TerminalLogger } from './terminal_logger.mjs';
 import { FileLogger } from './file_logger.mjs';
-import { once } from 'node:events';
+import { raceEvents } from './common.mjs';
 
 export class Run {
 
@@ -42,27 +42,22 @@ export class Run {
             if (judge.exited) {
                 throw new Error("Judge exited already");
             }
-            const ac = new AbortController();
-            const timer = setTimeout(() => ac.abort(new Error("Timeout exceeded")), 30 * 60 * 1000);
-            let type;
-            let payload;
-            try {
-                [type, [payload]] = await Promise.race([
-                    once(judge.eventEmitter, "done", { signal: ac.signal }).then(p => ["done", p]),
-                    once(judge.eventEmitter, "exit", { signal: ac.signal }).then(p => ["exit", p]),
-                ]);
-            } finally {
-                clearTimeout(timer);
-                ac.abort();
-            }
+            const [type, payload] = await raceEvents(
+                [
+                    { emitter: judge.eventEmitter, eventName: "done"},
+                    { emitter: judge.eventEmitter, eventName: "exit"}
+                ],
+                this.judgeCycleTime * 1000,
+                `Judge cycle timed out after ${this.judgeCycleTime}s`
+            );
             if (type === "done") {
-                verdict = payload;
+                verdict = payload[0];
                 TerminalLogger.writeLine(`Judge verdict: ${verdict}`);
             } else if (type === "exit") {
-                if (payload === null) {
+                if (payload[0] === null) {
                     TerminalLogger.writeLine("Judge process failed to start", TerminalLogger.COLOR_ERROR);
                 } else {
-                    TerminalLogger.writeLine(`Judge exited: ${payload}`);
+                    TerminalLogger.writeLine(`Judge exited: ${payload[0]}`);
                 }
             }
         } catch (error) {
