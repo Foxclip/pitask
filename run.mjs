@@ -101,7 +101,6 @@ export class Run {
         TerminalLogger.writeLine("Starting Worker process...", TerminalLogger.COLOR_DIM);
         const taskText = readFileSync(this.taskPath, "utf8");
         this.worker = new Worker(this.workerFileLogger);
-        // this.setJudgeTimer(this.judgeCycleTime);
         try {
             await this.worker.start(taskText);
         } catch (error) {

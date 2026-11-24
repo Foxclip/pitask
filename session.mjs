@@ -134,7 +134,7 @@ export class Session {
         const args = {
             type: "get_state"
         };
-        return await this.rpcCall(args).sessionFile;
+        return (await this.rpcCall(args)).sessionFile;
     }
 
     terminalLog(text, color) {
@@ -241,7 +241,7 @@ export class Session {
             message: message
         };
         this.steerCount++;
-        const disposition = await this.rpcCall(args).disposition;
+        const disposition = (await this.rpcCall(args)).disposition;
         this.terminalLog(`Steer ${disposition}`);
     }
 
@@ -250,7 +250,7 @@ export class Session {
             type: "new_session",
             parentSession: this.sessionPath
         };
-        const cancelled = await this.rpcCall(args).cancelled;
+        const cancelled = (await this.rpcCall(args)).cancelled;
         if (cancelled) {
             throw new Error("New session is cancelled");
         }
