@@ -3,7 +3,7 @@ import { Judge } from './judge.mjs';
 import { TerminalLogger } from './terminal_logger.mjs';
 import { FileLogger } from './file_logger.mjs';
 import { raceEvents } from './common.mjs';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 export class Run {
 
@@ -15,6 +15,8 @@ export class Run {
     terminalLogger;
     judgeFileLogger;
     workerFileLogger;
+    nudgeCount = 0;
+    distillCount = 0;
 
     constructor(runDir, taskPath, judgeCycleTime) {
         this.runDir = runDir;
@@ -41,7 +43,13 @@ export class Run {
         // wait for it
         let verdict;
         try {
-            await judge.start(this.runDir, this.taskPath, this.worker.sessionPath);
+            await judge.start({
+                runDir: this.runDir,
+                taskPath: this.taskPath,
+                workerSessionPath: this.worker.sessionPath,
+                nudgeCount: this.nudgeCount,
+                distillCount: this.distillCount
+            });
             if (judge.exited) {
                 throw new Error("Judge exited already");
             }
@@ -80,17 +88,44 @@ export class Run {
             if (decision === "OK") {
                 // skip
             } else if (decision === "NUDGE") {
-                if (!this.worker.settled && !this.worker.exited && decisionText)  {
+                const nudgeFilename = `${this.runDir}/NUDGE-${this.nudgeCount + 1}.md`;
+                if (this.worker.settled || this.worker.exited) {
+                    this.terminalLogger.logError("NUDGE failed: Worker exited");
+                } else if (!existsSync(nudgeFilename)) {
+                    this.terminalLogger.logError(`NUDGE failed: ${nudgeFilename} does not exist`);
+                } else {
                     try {
-                        await this.worker.steer(decisionText);
+                        const nudgeText = readFileSync(nudgeFilename, "utf8");
+                        this.terminalLogger.logDim("Sending steer message to Worker...");
+                        await this.worker.steer(nudgeText);
+                        this.nudgeCount++;
                     } catch(err) {
                         this.terminalLogger.logError(`NUDGE failed: ${err.message}`);
                     }
                 }
             } else if (decision === "DISTILL") {
-                // todo
+                if (this.worker.exited) {
+                    this.terminalLogger.logError("DISTILL failed: Worker exited");
+                } else {
+                    const distillFilename = `${this.runDir}/DISTILL-${this.distillCount + 1}.md`;
+                    if (!existsSync(distillFilename)) {
+                        this.terminalLogger.logError(`DISTILL failed: ${distillFilename} does not exist`);
+                    } else {
+                        try {
+                            const distillText = readFileSync(distillFilename, "utf8");
+                            this.terminalLogger.logDim("Starting new session...");
+                            await this.worker.newSession();
+                            this.terminalLogger.logDim("Sending prompt to Worker...");
+                            await this.worker.sendPrompt(distillText);
+                            this.distillCount++;
+                        } catch(err) {
+                            this.terminalLogger.logError(`DISTILL failed: ${err.message}`);
+                        }
+                    }
+                }
             } else if (decision === "STOP") {
-                // todo
+                this.terminalLogger.logDim("Stopping Worker...");
+                this.worker.killProcess();
             } else if (decision === "ERROR") {
                 // skip
             } else {

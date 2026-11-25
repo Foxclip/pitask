@@ -14,13 +14,13 @@ export class Session {
     sessionType;
     settled = false;
     exited = false;
-    promptCount = 0;
     steerCount = 0;
     messages = [];
     eventEmitter = new EventEmitter();
     terminalLogger;
     fileLogger;
     rpcCallId = 0;
+    newSessionPending = false;
 
     // these record types are not fully logged because their data is
     // already contained in other types
@@ -80,6 +80,15 @@ export class Session {
 
     async start() {
         this.sessionPath = await this.getSessionPath();
+    }
+
+    async sendPrompt(text, id) {
+        const args = {
+            id: id,
+            type: "prompt",
+            message: text
+        };
+        await this.rpcCall(args);
     }
 
     async rpcCall(args, timeoutMs = 10 * 60 * 1000) {
@@ -221,8 +230,10 @@ export class Session {
                     }
                 }
             } else if (record.type === 'agent_settled') {
-                this.onSettle();
-                this.quit();
+                if (!this.newSessionPending) {
+                    this.onSettle();
+                    this.quit();
+                }
             }
         }
     }
@@ -243,9 +254,14 @@ export class Session {
             type: "new_session",
             parentSession: this.sessionPath
         };
-        const cancelled = (await this.rpcCall(args)).cancelled;
-        if (cancelled) {
-            throw new Error("New session is cancelled");
+        this.newSessionPending = true;
+        try {
+            const cancelled = (await this.rpcCall(args)).cancelled;
+            if (cancelled) {
+                throw new Error("New session is cancelled");
+            }
+        } finally {
+            this.newSessionPending = false;
         }
         this.steerCount = 0;
         this.messages.length = 0;

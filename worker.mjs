@@ -8,12 +8,7 @@ export class Worker extends Session {
 
     async start(taskText) {
         await super.start();
-        const args = {
-            id: `worker-prompt-${++this.promptCount}`,
-            type: "prompt",
-            message: taskText
-        };
-        await this.rpcCall(args);
+        await this.sendPrompt(taskText);
     }
 
 }

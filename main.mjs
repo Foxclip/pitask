@@ -67,4 +67,3 @@ copyFileSync(taskPath, `${runDir}/TASK.md`);
 const run = new Run(runDir, taskPath, judgeCycleTime);
 await run.launch();
 
-// TODO: implement DISTILL verdict
