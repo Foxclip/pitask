@@ -27,7 +27,7 @@ export class ChunkProcessor {
                 record = JSON.parse(line);
                 records.push(record);
             } catch (err) {
-                this.terminalLogger.logError(`Failed to parse JSON record: ${line}`);
+                this.terminalLogger?.logError(`Failed to parse JSON record: ${line}`);
             }
         }
         return records;
