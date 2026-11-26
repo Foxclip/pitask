@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import { FileLogger } from './file_logger.mjs';
 import { EventEmitter } from 'events';
 import { ChunkProcessor } from './chunk_processor.mjs';
-import { raceEvents } from './common.mjs';
+import { rpcCall } from './common.mjs';
 
 export class Session {
 
@@ -95,49 +95,10 @@ export class Session {
         if (!args.id) {
             args.id = `rpc-${++this.rpcCallId}`;
         }
-        const chunkProcessor = new ChunkProcessor(this.terminalLogger);
-        const analyzeChunk = (chunk) => { 
-            const records = chunkProcessor.getRecords(chunk);
-            for (const record of records) {
-                if (record.type === "response" && record.command === args.type && record.id === args.id) {
-                    this.eventEmitter.emit(args.type, record);
-                }
-            }
-        };
         if (this.exited) {
             throw new Error(`RPC call failed (${args.type}): session already exited`);
         }
-        let stdinError;
-        const stdinListener = (err) => stdinError = err;
-        this.piProcess.stdout.on("data", analyzeChunk);
-        this.piProcess.stdin.on("error", stdinListener);
-        let type, payload;
-        try {
-            this.piProcess.stdin.write(`${JSON.stringify(args)}\n`);
-            [type, payload] = await raceEvents(
-                [
-                    { emitter: this.eventEmitter, eventName: args.type },
-                    { emitter: this.eventEmitter, eventName: "exit" }
-                ],
-                timeoutMs,
-                `RPC call timed out after ${timeoutMs / 1000}s (${args.type})`
-            );
-        } finally {
-            this.piProcess.stdin.off("error", stdinListener);
-            this.piProcess.stdout.off("data", analyzeChunk);
-        }
-        if (type !== args.type) {
-            if (stdinError) {
-                throw new Error(`RPC call failed (${args.type}): stdin: ${stdinError.message}`);
-            }
-            const exitCode = payload[0];
-            throw new Error(`RPC call failed (${args.type}): exit: ${exitCode}`);
-        }
-        const response = payload[0];
-        if (!response.success) {
-            throw new Error(`RPC call failed (${args.type}): ${response.error}`);
-        }
-        return response.data;
+        return await rpcCall(this.piProcess, args, timeoutMs);
     }
 
     async getSessionPath() {

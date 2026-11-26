@@ -34,12 +34,7 @@ export async function raceEvents(eventList, timeoutMs, timeoutErrorText) {
     return [type, payload];
 }
 
-export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, idInc, terminalLogger) {
-    if (idInc) {
-        if (!args.id) {
-            args.id = idInc();
-        }
-    }
+export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, terminalLogger) {
     const chunkProcessor = new ChunkProcessor(terminalLogger);
     let eventEmitter = new EventEmitter();
     const analyzeChunk = (chunk) => {
