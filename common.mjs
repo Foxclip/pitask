@@ -54,6 +54,12 @@ export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, idInc, ter
     const stdinListener = (err) => stdinError = err;
     proc.stdout.on("data", analyzeChunk);
     proc.stdin.on("error", stdinListener);
+    const stderrChunks = [];
+    let stderrListener;
+    if (proc.stderr) {
+        stderrListener = (chunk) => stderrChunks.push(chunk);
+        proc.stderr.on("data", stderrListener);
+    }
     if (proc.exitCode !== null) {
         proc.stdout.off("data", analyzeChunk);
         proc.stdin.off("error", stdinListener);
@@ -73,12 +79,20 @@ export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, idInc, ter
     } finally {
         proc.stdin.off("error", stdinListener);
         proc.stdout.off("data", analyzeChunk);
+        if (stderrListener) {
+            proc.stderr.off("data", stderrListener);
+        }
     }
     if (type !== args.type) {
         if (stdinError && proc.exitCode === null) {
             throw new Error(`RPC call failed (${args.type}): stdin: ${stdinError.message}`);
         }
-        throw new Error(`RPC call failed (${args.type}): process exited: ${proc.exitCode ?? payload[0]}`);
+        let stderrText = Buffer.concat(stderrChunks).toString().trim();
+        if (stderrText.length > 1000) {
+            stderrText = `...(truncated)\n${stderrText.slice(-1000)}`;
+        }
+        const stderrSuffix = stderrText ? `\nstderr: ${stderrText}` : "";
+        throw new Error(`RPC call failed (${args.type}): process exited: ${proc.exitCode ?? payload[0]}${stderrSuffix}`);
     }
     const response = payload[0];
     if (!response.success) {
