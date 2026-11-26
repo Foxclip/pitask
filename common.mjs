@@ -54,13 +54,18 @@ export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, idInc, ter
     const stdinListener = (err) => stdinError = err;
     proc.stdout.on("data", analyzeChunk);
     proc.stdin.on("error", stdinListener);
+    if (proc.exitCode !== null) {
+        proc.stdout.off("data", analyzeChunk);
+        proc.stdin.off("error", stdinListener);
+        throw new Error(`RPC call failed (${args.type}): process already exited: ${proc.exitCode}`);
+    }
     let type, payload;
     try {
         proc.stdin.write(`${JSON.stringify(args)}\n`);
         [type, payload] = await raceEvents(
             [
                 { emitter: eventEmitter, eventName: args.type },
-                { emitter: eventEmitter, eventName: "exit" }
+                { emitter: proc, eventName: "exit" }
             ],
             timeoutMs,
             `RPC call timed out after ${timeoutMs / 1000}s (${args.type})`
@@ -70,11 +75,10 @@ export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, idInc, ter
         proc.stdout.off("data", analyzeChunk);
     }
     if (type !== args.type) {
-        if (stdinError) {
+        if (stdinError && proc.exitCode === null) {
             throw new Error(`RPC call failed (${args.type}): stdin: ${stdinError.message}`);
         }
-        const exitCode = payload[0];
-        throw new Error(`RPC call failed (${args.type}): exit: ${exitCode}`);
+        throw new Error(`RPC call failed (${args.type}): process exited: ${proc.exitCode ?? payload[0]}`);
     }
     const response = payload[0];
     if (!response.success) {
