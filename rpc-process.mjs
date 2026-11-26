@@ -1,4 +1,4 @@
-import { ChunkProcessor } from "../chunk_processor.mjs";
+import { ChunkProcessor } from "./chunk_processor.mjs";
 
 function writeObj(obj) {
     process.stdout.write(`${JSON.stringify(obj)}\n`);
