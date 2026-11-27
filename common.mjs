@@ -56,8 +56,8 @@ export async function raceEvents(eventList, timeoutMs, timeoutErrorText) {
 }
 
 export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, terminalLogger) {
-    if (proc.exitCode !== null) {
-        throw new Error(`RPC call failed (${args.type}): process already exited: ${proc.exitCode}`);
+    if (proc.exitCode !== null || proc.signalCode !== null) {
+        throw new Error(`RPC call failed (${args.type}): process already exited: ${proc.exitCode ?? (proc.signalCode ? 'signal ' + proc.signalCode : proc.exitCode)}`);
     }
     const chunkProcessor = new ChunkProcessor(terminalLogger);
     const eventEmitter = new EventEmitter();
@@ -86,7 +86,7 @@ export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, terminalLo
             if (stdinError && proc.exitCode === null) {
                 throw new Error(`RPC call failed (${args.type}): stdin: ${stdinError.message}`);
             }
-            throw new Error(`RPC call failed (${args.type}): process exited: ${proc.exitCode ?? payload[0]}`);
+            throw new Error(`RPC call failed (${args.type}): process exited: ${proc.exitCode ?? (payload[1] ? 'signal ' + payload[1] : payload[0])}`);
         }
         const response = payload[0];
         if (!response.success) {
