@@ -5,7 +5,7 @@ import { ChunkProcessor } from "../chunk_processor.mjs";
 import { rpcCall } from "../common.mjs";
 
 function spawnRpcProcess(t) {
-    const rpcProcess = spawn("node", ["rpc-process.mjs"]);
+    const rpcProcess = spawn("node", ["mock-pi.mjs"]);
     t.after(() => rpcProcess.kill());
     assert.strictEqual(rpcProcess.exitCode, null);
     assert.strictEqual(rpcProcess.signalCode, null);
