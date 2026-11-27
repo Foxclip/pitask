@@ -522,7 +522,7 @@ function runScenario(m, message) {
     }
 }
 
-// CLI mode: run as a standalone mock pi rpc process (node rpc-process.mjs)
+// CLI mode: run as a standalone mock pi rpc process
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const mock = new MockPiProcess();
     mock.startup();

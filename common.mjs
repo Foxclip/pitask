@@ -10,6 +10,18 @@ export function generateRandomString(length = 10) {
     return result;
 }
 
+export function withTimeout(promise, ms, label) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            reject(new Error(`${label} timeout after ${ms}ms`));
+        }, ms);
+        promise.then(
+            (result) => { clearTimeout(timer); resolve(result); },
+            (error) => { clearTimeout(timer); reject(error); },
+        );
+    });
+}
+
 export async function raceEvents(eventList, timeoutMs, timeoutErrorText) {
     if (eventList.length === 0) {
         throw new Error("Must pass at least one event");
