@@ -9,7 +9,9 @@ const contextWindow = 262144;
 
 let turnMessage;
 let turnToolResults = [];
+let agentMessages = [];
 let sessionMessages = [];
+let userMessageCount = 0;
 
 function writeObj(obj) {
     process.stdout.write(`${JSON.stringify(obj)}\n`);
@@ -81,19 +83,22 @@ function promptResponse(id, message) {
     writeObj({ type: "agent_start" });
     writeObj({ type: "turn_start" });
 
-    let systemMessage = {
-        role: "system",
-        content: "",
-        sections: {
-            preamble: "You are a coding assistant running inside pi",
-        },
-        timestamp: Date.now(),
-        toolsAdded: []
-    };
-    writeObj({ type: "message_start", message: systemMessage });
-    systemMessage.timestamp = Date.now();
-    writeObj({ type: "message_end", message: systemMessage });
-    sessionMessages.push(systemMessage);
+    if (userMessageCount === 0) {
+        let systemMessage = {
+            role: "system",
+            content: "",
+            sections: {
+                preamble: "You are a coding assistant running inside pi",
+            },
+            timestamp: Date.now(),
+            toolsAdded: []
+        };
+        writeObj({ type: "message_start", message: systemMessage });
+        systemMessage.timestamp = Date.now();
+        writeObj({ type: "message_end", message: systemMessage });
+        agentMessages.push(systemMessage);
+        sessionMessages.push(systemMessage);
+    }
 
     let userMessage = {
         role: "user",
@@ -103,6 +108,8 @@ function promptResponse(id, message) {
     writeObj({ type: "message_start", message: userMessage });
     userMessage.timestamp = Date.now();
     writeObj({ type: "message_end", message: userMessage });
+    userMessageCount++;
+    agentMessages.push(userMessage);
     sessionMessages.push(userMessage);
 }
 
@@ -231,6 +238,7 @@ function thinkWithToolCall(thinkText, toolName, toolArgs, toolText) {
         type: "message_end",
         message: message
     });
+    agentMessages.push(message);
     sessionMessages.push(message);
 
     return toolCallId;
@@ -315,6 +323,7 @@ function toolExecute(toolCallId, toolName, toolArgs, toolResult) {
     writeObj({ type: "message_start", message: toolResultMessage });
     toolResultMessage.timestamp = Date.now();
     writeObj({ type: "message_end", message: toolResultMessage });
+    agentMessages.push(toolResultMessage);
     sessionMessages.push(toolResultMessage);
 
     turnToolResults.push(toolResultMessage);
@@ -438,6 +447,7 @@ function sendMessage(thinkText, messageText) {
         type: "message_end",
         message: message
     });
+    agentMessages.push(message);
     sessionMessages.push(message);
 }
 
@@ -454,9 +464,10 @@ function endTurn() {
 function endAgent() {
     writeObj({
         type: "agent_end",
-        messages: sessionMessages,
+        messages: agentMessages,
         willRetry: false
     });
+    agentMessages.length = 0;
 }
 
 function settle() {
