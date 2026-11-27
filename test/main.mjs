@@ -7,7 +7,7 @@ import { rpcCall, withTimeout } from "../common.mjs";
 const rpcCallTimeoutMs = 1000;
 
 function spawnRpcProcess(t) {
-    const rpcProcess = spawn("node", ["mock-pi.mjs"]);
+    const rpcProcess = spawn("node", ["mock-pi.mjs"], { stdio: ["pipe", "pipe", "inherit"] });
     t.after(() => rpcProcess.kill());
     assert.strictEqual(rpcProcess.exitCode, null);
     assert.strictEqual(rpcProcess.signalCode, null);
