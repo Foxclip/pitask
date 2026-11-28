@@ -93,15 +93,20 @@ export class Run {
                 // skip
             } else if (decision === "NUDGE") {
                 const nudgeFilename = `${this.runDir}/NUDGE-${this.nudgeCount + 1}.md`;
-                if (this.worker.settled || this.worker.exited) {
+                if (this.worker.exited) {
                     this.terminalLogger.logError("NUDGE failed: Worker exited");
                 } else if (!existsSync(nudgeFilename)) {
                     this.terminalLogger.logError(`NUDGE failed: ${nudgeFilename} does not exist`);
                 } else {
                     try {
                         const nudgeText = readFileSync(nudgeFilename, "utf8");
-                        this.terminalLogger.logDim("Sending steer message to Worker...");
-                        await this.worker.steer(nudgeText);
+                        if (this.worker.settled) {
+                            this.terminalLogger.logDim("Sending prompt message to Worker...");
+                            await this.worker.sendPrompt(nudgeText);
+                        } else {
+                            this.terminalLogger.logDim("Sending steer message to Worker...");
+                            await this.worker.steer(nudgeText);
+                        }
                         this.nudgeCount++;
                     } catch(err) {
                         this.terminalLogger.logError(`NUDGE failed: ${err.message}`);
