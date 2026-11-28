@@ -122,8 +122,9 @@ export class Session {
                     }
                 }
             }
-
-            if (record.type === 'message_update') {
+            if (record.type === "agent_start") {
+                this.settled = false;
+            } else if (record.type === 'message_update') {
                 const amEvent = record.assistantMessageEvent;
                 if (amEvent && amEvent.type === 'thinking_start') {
                     this.terminalLogger.logDim(`[${this.sessionType}]: thinking...`);
@@ -234,7 +235,6 @@ export class Session {
         }
         this.steerCount = 0;
         this.messages.length = 0;
-        this.settled = false;
         this.sessionPath = await this.getSessionPath();
     }
 
