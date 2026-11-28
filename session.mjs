@@ -191,10 +191,18 @@ export class Session {
                     }
                 }
             } else if (record.type === 'agent_settled') {
-                if (!this.newSessionPending) {
-                    this.onSettle();
-                    this.quit();
+                const aborted = record.aborted;
+                if (aborted) {
+                    this.terminalLogger.logError(`[${this.sessionType}]: session was aborted`);
                 }
+                if (!this.newSessionPending) {
+                    this.onSettle(aborted);
+                    if (!aborted) {
+                        this.quit();
+                    }
+                }
+            } else if (record.type === 'extension_ui_request' && record.method === 'notify') {
+                this.terminalLogger.logError(`[${this.sessionType}]: ${record.message}`);
             }
         }
     }
@@ -230,7 +238,7 @@ export class Session {
         this.sessionPath = await this.getSessionPath();
     }
 
-    onSettle() {
+    onSettle(aborted) {
         this.settled = true;
     }
 

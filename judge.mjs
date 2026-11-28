@@ -53,8 +53,8 @@ export class Judge extends Session {
         await this.sendPrompt(this.prompt);
     }
 
-    onSettle() {
-        super.onSettle();
+    onSettle(aborted) {
+        super.onSettle(aborted);
         if (this.messages.length > 0) {
             const lastMessage = this.messages.at(-1);
             const messageTrimmed = lastMessage.trimEnd();
@@ -63,7 +63,7 @@ export class Judge extends Session {
             this.verdict = m ? m[1].trim() : `ERROR: decision could not be parsed`;
             this.eventEmitter.emit("done", this.verdict);
         } else {
-            this.eventEmitter.emit("done", `ERROR: no messages`);
+            this.eventEmitter.emit("done", "ERROR: no messages");
         }
     }
 
