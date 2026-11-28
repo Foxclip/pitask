@@ -32,27 +32,20 @@ export async function raceEvents(eventList, timeoutMs, timeoutErrorText) {
         timedOut = true;
         ac.abort();
     }, timeoutMs);
-    let type;
-    let payload;
     try {
-        const promises = [];
-        for (const evPair of eventList) {
-            promises.push(once(evPair.emitter, evPair.eventName, { signal: ac.signal }).then(p => [evPair.eventName, p]));
-        }
-        [type, payload] = await Promise.race(promises);
+        const promises = eventList.map(async ({ emitter, eventName }) => {
+            return once(emitter, eventName, { signal: ac.signal }).then(p => [eventName, p]);
+        });
+        return await Promise.race(promises);
     } catch (err) {
         if (timedOut) {
-            if (!timeoutErrorText) {
-                timeoutErrorText = `raceEvents timed out after ${timeoutMs / 1000}s`;
-            }
-            throw new Error(timeoutErrorText);
+            throw new Error(timeoutErrorText ?? `raceEvents timed out after ${timeoutMs / 1000}s`);
         }
         throw err;
     } finally {
         clearTimeout(timer);
         ac.abort();
     }
-    return [type, payload];
 }
 
 export async function rpcCall(proc, args, timeoutMs = 10 * 60 * 1000, terminalLogger) {
