@@ -67,3 +67,4 @@ copyFileSync(taskPath, `${runDir}/TASK.md`);
 const run = new Run(runDir, taskPath, judgeCycleTime);
 await run.launch();
 
+// TODO: don't quit Worker on settle, summon Judge instead

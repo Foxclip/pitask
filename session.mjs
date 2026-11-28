@@ -108,6 +108,89 @@ export class Session {
         return (await this.rpcCall(args)).sessionFile;
     }
 
+    handleMessageUpdate(record) {
+        const amEvent = record.assistantMessageEvent;
+        if (amEvent && amEvent.type === 'thinking_start') {
+            this.terminalLogger.logDim(`[${this.sessionType}]: thinking...`);
+        } else if (amEvent && amEvent.type === 'text_start') {
+            this.terminalLogger.logDim(`[${this.sessionType}]: writing message...`);
+        }
+    }
+
+    handleToolExecution(record) {
+        const toolName = record.toolName;
+        if (Object.keys(record.args).length === 1) {
+            const argName = Object.keys(record.args)[0];
+            const argValue = record.args[argName];
+            const toolStr = `[${this.sessionType}]: ${toolName}: ${argName}: ${argValue}`;
+            const toolStrLimited = this.limitString(toolStr, this.TOOL_MAX_LINE_SIZE);
+            this.terminalLogger.logNormal(toolStrLimited);
+        } else {
+            this.terminalLogger.logNormal(`[${this.sessionType}]: ${toolName}:`);
+            for (const [key, value] of Object.entries(record.args)) {
+                const commandStr = `    ${key}: ${value}`;
+                const commandStrLimited = this.limitString(commandStr, this.TOOL_MAX_LINE_SIZE);
+                this.terminalLogger.logNormal(commandStrLimited);
+            }
+        }
+    }
+
+    handleMessageEnd(record) {
+        const message = record.message;
+        const content = message.content;
+        const role = message.role;
+        let thinking;
+        let text;
+        let toolName;
+        if (role === 'system') {
+            // skip
+        } else if (role === "toolResult") {
+            // skip
+        } else if (role === "user") {
+            // skip
+        } else {
+            if (Array.isArray(content) && content.length > 0) {
+                for (const block of content) {
+                    if (block.type === 'thinking') {
+                        thinking = block.thinking;
+                    } else if (block.type === 'text') {
+                        text = block.text;
+                    } else if (block.type === 'toolCall') {
+                        toolName = block.name;
+                    }
+                }
+                if (text) {
+                    this.terminalLogger.logNormal(`[${this.sessionType}]: \n${text}`);
+                    this.messages.push(text);
+                }
+                if (!text && !toolName) {
+                    if (thinking) {
+                        this.terminalLogger.logDim(`[${this.sessionType}]: <thinking only>`);
+                    } else {
+                        this.terminalLogger.logNormal(`[${this.sessionType}]: ### NO CONTENT ###`);
+                    }
+                }
+            } else if (message.errorMessage) {
+                this.terminalLogger.logError(`[${this.sessionType}]: ${message.errorMessage}`);
+            } else {
+                this.terminalLogger.logDim(`[${this.sessionType}]: ${JSON.stringify(record)}`);
+            }
+        }
+    }
+
+    handleAgentSettled(record) {
+        const aborted = record.aborted;
+        if (aborted) {
+            this.terminalLogger.logError(`[${this.sessionType}]: session was aborted`);
+        }
+        if (!this.newSessionPending) {
+            this.onSettle(aborted);
+            if (!aborted) {
+                this.quit();
+            }
+        }
+    }
+
     onDataArrive(chunk) {
         const records = this.chunkProcessor.getRecords(chunk);
         for (const record of records) {
@@ -125,83 +208,13 @@ export class Session {
             if (record.type === "agent_start") {
                 this.settled = false;
             } else if (record.type === 'message_update') {
-                const amEvent = record.assistantMessageEvent;
-                if (amEvent && amEvent.type === 'thinking_start') {
-                    this.terminalLogger.logDim(`[${this.sessionType}]: thinking...`);
-                } else if (amEvent && amEvent.type === 'text_start') {
-                    this.terminalLogger.logDim(`[${this.sessionType}]: writing message...`);
-                }
+                this.handleMessageUpdate(record);
             } else if (record.type === "tool_execution_start") {
-                const toolName = record.toolName;
-                if (Object.keys(record.args).length === 1) {
-                    const argName = Object.keys(record.args)[0];
-                    const argValue = record.args[argName];
-                    const toolStr = `[${this.sessionType}]: ${toolName}: ${argName}: ${argValue}`;
-                    const toolStrLimited = this.limitString(toolStr, this.TOOL_MAX_LINE_SIZE);
-                    this.terminalLogger.logNormal(toolStrLimited);
-                } else {
-                    this.terminalLogger.logNormal(`[${this.sessionType}]: ${toolName}:`);
-                    for (const [key, value] of Object.entries(record.args)) {
-                        const commandStr = `    ${key}: ${value}`;
-                        const commandStrLimited = this.limitString(commandStr, this.TOOL_MAX_LINE_SIZE);
-                        this.terminalLogger.logNormal(commandStrLimited);
-                    }
-                }
+                this.handleToolExecution(record);
             } else if (record.type === 'message_end') {
-                const message = record.message;
-                const content = message.content;
-                const role = message.role;
-                let thinking;
-                let text;
-                let toolName;
-                if (role === 'system') {
-                    // skip
-                } else if (role === "toolResult") {
-                    // skip
-                } else if (role === "user") {
-                    // skip
-                } else {
-                    if (Array.isArray(content) && content.length > 0) {
-                        for (const block of content) {
-                            if (block.type === 'thinking') {
-                                thinking = block.thinking;
-                            } else if (block.type === 'text') {
-                                text = block.text;
-                            } else if (block.type === 'toolCall') {
-                                toolName = block.name;
-                            }
-                        }
-                        if (text) {
-                            this.terminalLogger.logNormal(`[${this.sessionType}]: \n${text}`);
-                            this.messages.push(text);
-                        }
-                        if (toolName) {
-                            // Logger.writeLine(`Tool: ${toolName}`);
-                        }
-                        if (!text && !toolName) {
-                            if (thinking) {
-                                this.terminalLogger.logDim(`[${this.sessionType}]: <thinking only>`);
-                            } else {
-                                this.terminalLogger.logNormal(`[${this.sessionType}]: ### NO CONTENT ###`);
-                            }
-                        }
-                    } else if (message.errorMessage) {
-                        this.terminalLogger.logError(`[${this.sessionType}]: ${message.errorMessage}`);
-                    } else {
-                        this.terminalLogger.logDim(`[${this.sessionType}]: ${JSON.stringify(record)}`);
-                    }
-                }
+                this.handleMessageEnd(record);
             } else if (record.type === 'agent_settled') {
-                const aborted = record.aborted;
-                if (aborted) {
-                    this.terminalLogger.logError(`[${this.sessionType}]: session was aborted`);
-                }
-                if (!this.newSessionPending) {
-                    this.onSettle(aborted);
-                    if (!aborted) {
-                        this.quit();
-                    }
-                }
+                this.handleAgentSettled(record);
             } else if (record.type === 'extension_ui_request' && record.method === 'notify') {
                 this.terminalLogger.logError(`[${this.sessionType}]: ${record.message}`);
             }
