@@ -80,6 +80,10 @@ export class Run {
             }
         }
 
+        if (!judge.exited) {
+            judge.killProcess();
+        }
+
         // act on verdict
         if (verdict) {
             const colonIndex = verdict.indexOf(':');

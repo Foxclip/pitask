@@ -47,7 +47,8 @@ export class Judge extends Session {
 
 - DISTILL is for CONTEXT ROT only: the worker is confidently repeating a wrong premise, working from a refuted plan, or re-doing work it already did — the transcript itself is now the problem. It is DESTRUCTIVE and bounded: the worker's current session would be discarded and a FRESH session would be relaunched with a distilled brief (task + what it got right so far). Do NOT use it for slow progress (NUDGE), a task that cannot succeed (STOP), or ordinary stuckness (NUDGE first).
 
-- Any other final line is treated as OK. Do NOT end with anything after the DECISION line.`;
+- Any other final line is treated as OK. Do NOT end with anything after the DECISION line.
+- The verdict message must contain NO tool call. This session ends immediately with the verdict: the process is killed right after the DECISION line, so no further tool calls, re-reads, or polling are possible or needed.`;
 
         await this.sendPrompt(this.prompt);
     }
